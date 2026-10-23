@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/backend/">
+    <Project Path="backend/Andacryx.Api/Andacryx.Api.csproj" />
+    <Project Path="backend/Andacryx.Application/Andacryx.Application.csproj" />
+    <Project Path="backend/Andacryx.Domain/Andacryx.Domain.csproj" />
+    <Project Path="backend/Andacryx.Infrastructure/Andacryx.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Andacryx.Tests/Andacryx.Tests.csproj" />
+  </Folder>
+</Solution>
