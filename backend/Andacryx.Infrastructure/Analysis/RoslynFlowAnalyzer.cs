@@ -11,10 +11,7 @@ public sealed class RoslynFlowAnalyzer
     public FlowAnalysisResult Analyze(string fileName, string sourceCode)
     {
         var root = CSharpSyntaxTree.ParseText(sourceCode).GetRoot();
-
-        var methods = root.DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Select(BuildMethodFlow).ToList();
-
+        var methods = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Select(BuildMethodFlow).ToList();
         return new FlowAnalysisResult(fileName, methods);
     }
 
@@ -28,19 +25,14 @@ public sealed class RoslynFlowAnalyzer
         {
             var id = $"node-{++counter}";
             var span = syntax.GetLocation().GetLineSpan();
-
-            nodes.Add(new FlowNodeDto(
-                id, type, label, syntax.ToString().Trim(),
-                span.StartLinePosition.Line + 1,
-                span.EndLinePosition.Line + 1
-            ));
-
+            nodes.Add(new FlowNodeDto(id, type, label, syntax.ToString().Trim(),
+                span.StartLinePosition.Line + 1, span.EndLinePosition.Line + 1));
             return id;
         }
 
-        void Connect(string source, string target, string? label = null)
+        void Connect(string source, string target, string? label = null, string kind = "normal")
         {
-            edges.Add(new FlowEdgeDto($"edge-{edges.Count + 1}", source, target, label));
+            edges.Add(new FlowEdgeDto($"edge-{edges.Count + 1}", source, target, label, kind));
         }
 
         var start = AddNode("start", $"{method.Identifier.Text}()", method);
@@ -60,13 +52,10 @@ public sealed class RoslynFlowAnalyzer
             {
                 var condition = AddNode("condition", $"if ({ifStatement.Condition})", ifStatement.Condition);
                 var trueStart = BuildBlock(ifStatement.Statement, next, breakTarget, continueTarget);
-                var falseStart = ifStatement.Else is null
-                    ? next
-                    : BuildBlock(ifStatement.Else.Statement, next, breakTarget, continueTarget);
+                var falseStart = ifStatement.Else is null ? next : BuildBlock(ifStatement.Else.Statement, next, breakTarget, continueTarget);
 
-                Connect(condition, trueStart, "True");
-                Connect(condition, falseStart, "False");
-
+                Connect(condition, trueStart, "True", "true");
+                Connect(condition, falseStart, "False", "false");
                 return condition;
             }
 
@@ -75,11 +64,8 @@ public sealed class RoslynFlowAnalyzer
                 var loop = AddNode("loop", $"for ({forStatement.Condition?.ToString() ?? "true"})", forStatement);
                 var bodyStart = BuildBlock(forStatement.Statement, loop, next, loop);
 
-                Connect(loop, bodyStart, "True");
-
-                if (forStatement.Condition is not null)
-                    Connect(loop, next, "False");
-
+                Connect(loop, bodyStart, "True", "true");
+                if (forStatement.Condition is not null) Connect(loop, next, "False", "false");
                 return loop;
             }
 
@@ -88,9 +74,8 @@ public sealed class RoslynFlowAnalyzer
                 var loop = AddNode("loop", $"foreach ({foreachStatement.Identifier} in {foreachStatement.Expression})", foreachStatement);
                 var bodyStart = BuildBlock(foreachStatement.Statement, loop, next, loop);
 
-                Connect(loop, bodyStart, "True");
-                Connect(loop, next, "False");
-
+                Connect(loop, bodyStart, "True", "true");
+                Connect(loop, next, "False", "false");
                 return loop;
             }
 
@@ -99,9 +84,8 @@ public sealed class RoslynFlowAnalyzer
                 var loop = AddNode("loop", $"while ({whileStatement.Condition})", whileStatement);
                 var bodyStart = BuildBlock(whileStatement.Statement, loop, next, loop);
 
-                Connect(loop, bodyStart, "True");
-                Connect(loop, next, "False");
-
+                Connect(loop, bodyStart, "True", "true");
+                Connect(loop, next, "False", "false");
                 return loop;
             }
 
@@ -110,50 +94,47 @@ public sealed class RoslynFlowAnalyzer
                 var loop = AddNode("loop", $"while ({doStatement.Condition})", doStatement.Condition);
                 var bodyStart = BuildBlock(doStatement.Statement, loop, next, loop);
 
-                Connect(loop, bodyStart, "True");
-                Connect(loop, next, "False");
-
+                Connect(loop, bodyStart, "True", "true");
+                Connect(loop, next, "False", "false");
                 return bodyStart;
             }
 
             if (statement is ReturnStatementSyntax returnStatement)
             {
                 var node = AddNode("process", returnStatement.ToString(), returnStatement);
-                Connect(node, end);
+                Connect(node, end, null, "return");
                 return node;
             }
 
             if (statement is BreakStatementSyntax breakStatement)
             {
                 var node = AddNode("process", "break", breakStatement);
-                Connect(node, breakTarget ?? next);
+                Connect(node, breakTarget ?? next, null, "break");
                 return node;
             }
 
             if (statement is ContinueStatementSyntax continueStatement)
             {
                 var node = AddNode("process", "continue", continueStatement);
-                Connect(node, continueTarget ?? next);
+                Connect(node, continueTarget ?? next, null, "continue");
                 return node;
             }
 
             var process = AddNode("process", statement.ToString(), statement);
-            Connect(process, next);
+            var nextNode = nodes.FirstOrDefault(node => node.Id == next);
 
+            var kind = nextNode?.Type == "loop" ? "back" : "normal";
+            Connect(process, next, null, kind);
             return process;
         }
 
         var first = end;
 
-        if (method.Body is not null)
-        {
-            first = BuildBlock(method.Body, end);
-        }
+        if (method.Body is not null) first = BuildBlock(method.Body, end);
         else if (method.ExpressionBody is not null)
         {
             var expression = method.ExpressionBody.Expression;
             var node = AddNode("process", expression.ToString(), expression);
-
             Connect(node, end);
             first = node;
         }
@@ -161,13 +142,7 @@ public sealed class RoslynFlowAnalyzer
         Connect(start, first);
 
         var span = method.GetLocation().GetLineSpan();
-
-        return new MethodFlowDto(
-            method.Identifier.Text,
-            span.StartLinePosition.Line + 1,
-            span.EndLinePosition.Line + 1,
-            nodes,
-            edges
-        );
+        return new MethodFlowDto(method.Identifier.Text, span.StartLinePosition.Line + 1,
+            span.EndLinePosition.Line + 1, nodes, edges);
     }
 }

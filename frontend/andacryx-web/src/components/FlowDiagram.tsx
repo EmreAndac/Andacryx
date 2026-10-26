@@ -1,8 +1,9 @@
 
 import { useEffect, useMemo, useState } from "react";
-import { ReactFlow, Background, Controls, MarkerType, Position, useNodesInitialized, useReactFlow, type Node, type Edge } from "@xyflow/react";
+import { ReactFlow, Background, Controls, MarkerType, useNodesInitialized, useReactFlow, type Node, type Edge } from "@xyflow/react";
 import ELK from "elkjs/lib/elk.bundled.js";
 import "@xyflow/react/dist/style.css";
+import FlowNode from "./FlowNode";
 
 const elk = new ELK();
 const NODE_WIDTH = 240;
@@ -22,6 +23,7 @@ export type FlowEdgeDto = {
   source: string;
   target: string;
   label: string | null;
+  kind: "normal" | "true" | "false" | "back" | "return" | "break" | "continue";
 };
 
 export type MethodFlowDto = {
@@ -37,17 +39,6 @@ type Props = {
   onNodeSelect: (node: FlowNodeDto) => void;
 };
 
-function getNodeColor(type: string) {
-  switch (type) {
-    case "start": return "#14532d";
-    case "end": return "#7f1d1d";
-    case "condition": return "#312e81";
-    case "loop": return "#164e63";
-    default: return "#1e293b";
-  }
-}
-
-
 function AutoFit({ ready }: { ready: boolean }) {
   const initialized = useNodesInitialized();
   const { fitView } = useReactFlow();
@@ -61,6 +52,7 @@ function AutoFit({ ready }: { ready: boolean }) {
   return null;
 }
 
+const nodeTypes = { flowNode: FlowNode };
 
 export default function FlowDiagram({ method, onNodeSelect }: Props) {
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -70,10 +62,23 @@ export default function FlowDiagram({ method, onNodeSelect }: Props) {
     id: edge.id,
     source: edge.source,
     target: edge.target,
+    sourceHandle: edge.kind === "false" ? "false" : "out",
+    targetHandle: method.nodes.find(node => node.id === edge.target)?.type === "loop" &&
+        method.nodes.find(node => node.id === edge.source)?.type !== "start"
+            ? "back"
+            : "in",
     label: edge.label ?? undefined,
     type: "smoothstep",
+    labelBgBorderRadius: 4,
+    pathOptions: { borderRadius: 16, offset: 30 },
+    animated: edge.kind === "back" || edge.kind === "continue",
     markerEnd: { type: MarkerType.ArrowClosed },
-    style: { stroke: "#94a3b8", strokeWidth: 1.5 },
+    style: {
+        stroke: edge.kind === "true" ? "#22c55e" :
+                edge.kind === "false" ? "#f59e0b" :
+                edge.kind === "back" ? "#38bdf8" : "#94a3b8",
+        strokeWidth: edge.kind === "back" ? 2.5 : 1.5
+    },
     labelStyle: { fill: "#e2e8f0", fontSize: 11 },
     labelBgStyle: { fill: "#0f172a" },
     labelBgPadding: [5, 3] as [number, number]
@@ -92,14 +97,18 @@ export default function FlowDiagram({ method, onNodeSelect }: Props) {
         return a.startLine - b.startLine;
       });
 
-        const nodeOrder = new Map(orderedNodes.map((node, index) => [node.id, index]));
+      const nodeOrder = new Map(orderedNodes.map((node, index) => [node.id, index]));
 
-        const layoutEdges = method.edges.filter(edge => {
-          const sourceIndex = nodeOrder.get(edge.source);
-          const targetIndex = nodeOrder.get(edge.target);
+      const layoutEdges = method.edges.filter(edge => {
+      const sourceIndex = nodeOrder.get(edge.source);
+      const targetIndex = nodeOrder.get(edge.target);
 
-          return sourceIndex !== undefined && targetIndex !== undefined && sourceIndex < targetIndex;
-        });
+      return edge.kind !== "back" &&
+        edge.kind !== "continue" &&
+        sourceIndex !== undefined &&
+        targetIndex !== undefined &&
+        sourceIndex < targetIndex;
+      });
       const graph = {
         id: "root",
         layoutOptions: {
@@ -135,23 +144,9 @@ export default function FlowDiagram({ method, onNodeSelect }: Props) {
 
           return {
             id: node.id,
+            type: "flowNode",
             position: { x: position?.x ?? 0, y: position?.y ?? 0 },
-            sourcePosition: Position.Bottom,
-            targetPosition: Position.Top,
-            data: { label: node.label },
-            style: {
-              width: NODE_WIDTH,
-              minHeight: NODE_HEIGHT,
-              padding: 12,
-              borderRadius: 10,
-              border: "1px solid #475569",
-              background: getNodeColor(node.type),
-              color: "#e2e8f0",
-              fontSize: 12,
-              textAlign: "center",
-              whiteSpace: "pre-wrap",
-              overflowWrap: "anywhere"
-            }
+            data: { label: node.label, kind: node.type }
           };
         });
 
@@ -174,6 +169,7 @@ export default function FlowDiagram({ method, onNodeSelect }: Props) {
       <ReactFlow
         key={`${method.name}-${method.startLine}`}
         nodes={nodes}
+        nodeTypes={nodeTypes}
         edges={edges}
         fitView
         fitViewOptions={{ padding: 0.2 }}
