@@ -120,3 +120,53 @@ header span {
 .error {
   color: #f87171;
 }
+
+
+button.method {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: #93c5fd;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+button.method:hover {
+  background: #1e293b;
+}
+
+.code-preview {
+  overflow-x: auto;
+  padding: 20px;
+  border-radius: 8px;
+  background: #020617;
+  color: #93c5fd;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.results {
+  min-width: 0;
+}
+
+.react-flow__node {
+  transition: box-shadow 0.2s ease;
+}
+
+.react-flow__node:hover {
+  box-shadow: 0 0 0 2px #38bdf8;
+}
+
+.react-flow__edge-text {
+  font-weight: 600;
+}
+
+.react-flow__controls {
+  border-radius: 8px;
+  overflow: hidden;
+}
