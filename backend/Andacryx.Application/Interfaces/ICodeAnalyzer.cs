@@ -4,8 +4,6 @@ namespace Andacryx.Application.Interfaces;
 
 public interface ICodeAnalyzer
 {
-    CodeAnalysisResult Analyze(
-        string fileName,
-        string sourceCode
-    );
+    CodeAnalysisResult Analyze(string fileName, string sourceCode);
+    FlowAnalysisResult AnalyzeFlow(string fileName, string sourceCode);
 }

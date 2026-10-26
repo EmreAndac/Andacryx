@@ -61,4 +61,19 @@ app.MapPost("/api/analysis/upload",
     })
 .DisableAntiforgery();
 
+app.MapPost("/api/analysis/flow", async (IFormFile file, ICodeAnalyzer analyzer) =>
+{
+    if (!Path.GetExtension(file.FileName).Equals(".cs", StringComparison.OrdinalIgnoreCase))
+        return Results.BadRequest(new { error = "Only .cs files are supported." });
+
+    if (file.Length == 0 || file.Length > 1024 * 1024)
+        return Results.BadRequest(new { error = "File must be between 1 byte and 1 MB." });
+
+    using var reader = new StreamReader(file.OpenReadStream());
+    var sourceCode = await reader.ReadToEndAsync();
+    var result = analyzer.AnalyzeFlow(Path.GetFileName(file.FileName), sourceCode);
+
+    return Results.Ok(result);
+}).DisableAntiforgery();
+
 app.Run();
