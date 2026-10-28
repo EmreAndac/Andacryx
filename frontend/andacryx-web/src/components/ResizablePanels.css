@@ -1,0 +1,81 @@
+
+.resizable-panels {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 0;
+  align-items: stretch;
+}
+
+.resizable-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.resizable-divider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+  z-index: 5;
+}
+
+.resizable-divider::before {
+  content: "";
+  position: absolute;
+  width: 2px;
+  height: 100%;
+  background: #334155;
+  transition: background 0.15s;
+}
+
+.resizable-divider:hover::before,
+.resizable-divider:focus-visible::before,
+.is-dragging .resizable-divider::before {
+  background: #3b82f6;
+}
+
+.resizable-divider-grip {
+  position: relative;
+  width: 5px;
+  height: 48px;
+  border-radius: 8px;
+  background: #64748b;
+  z-index: 1;
+}
+
+.resizable-divider:hover .resizable-divider-grip,
+.is-dragging .resizable-divider-grip {
+  background: #60a5fa;
+}
+
+.is-dragging,
+.is-dragging * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+@media (max-width: 1200px) {
+  .resizable-panels {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .resizable-divider {
+    display: none;
+  }
+
+  .resizable-panel {
+    width: 100%;
+  }
+}
+
+.resizable-panels.is-dragging .monaco-editor,
+.resizable-panels.is-dragging .react-flow {
+  pointer-events: none;
+}

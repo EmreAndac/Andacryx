@@ -103,6 +103,7 @@ export default function FlowDiagram({ method, onNodeSelect }: Props) {
           sourceHandle: isFalse ? "false" : "out",
           targetHandle: isLoopReturn ? (isFalse ? "falseBack" : "back") : "in",
           type: "flowEdge",
+          zIndex: isLoopReturn && isFalse ? 10 : 0,
           data: { kind: isLoopReturn && isFalse ? "falseBack" : edge.kind },
           pathOptions: {
             borderRadius: 18,

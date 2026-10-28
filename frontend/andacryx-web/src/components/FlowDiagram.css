@@ -1,0 +1,17 @@
+
+.react-flow__node {
+  transition: box-shadow 0.2s ease;
+}
+
+.react-flow__node:hover {
+  box-shadow: 0 0 0 2px var(--accent-hover);
+}
+
+.react-flow__edge-text {
+  font-weight: 600;
+}
+
+.react-flow__controls {
+  border-radius: 8px;
+  overflow: hidden;
+}
