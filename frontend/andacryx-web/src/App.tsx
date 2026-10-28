@@ -9,102 +9,194 @@ import "./components/TopBar.css";
 import "./components/Sidebar.css";
 import "./components/CodeInspector.css";
 import "./components/FlowDiagram.css";
+import FileTabs from "./components/FileTabs";
 import CodeInspector from "./components/CodeInspector";
 import ResizablePanels from "./components/ResizablePanels";
 import TopBar from "./components/TopBar";
 import { APP_CONFIG } from "./config/app.config";
-import Sidebar, {
-  type AnalysisResult,
-  type MethodInfo,
-} from "./components/Sidebar";
+import Sidebar, { type MethodInfo } from "./components/Sidebar";
 import WorkspaceToolbar, {
   type WorkspaceView,
 } from "./components/WorkspaceToolbar";
+import type { WorkspaceFile, FlowAnalysisResult } from "./types/workspace";
 
-type FlowAnalysisResult = { fileName: string; methods: MethodFlowDto[] };
+const API_BASE_URL = "http://localhost:5050";
 
 export default function App() {
-  const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [flowResult, setFlowResult] = useState<FlowAnalysisResult | null>(null);
+  const [files, setFiles] = useState<WorkspaceFile[]>([]);
+  const [openFileIds, setOpenFileIds] = useState<string[]>([]);
+  const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<MethodFlowDto | null>(
     null,
   );
   const [selectedNode, setSelectedNode] = useState<FlowNodeDto | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [sourceCode, setSourceCode] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("split");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeFile = files.find((file) => file.id === activeFileId) ?? null;
 
   function openFilePicker() {
     fileInputRef.current?.click();
   }
 
-  async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  async function analyzeFile(file: File): Promise<WorkspaceFile> {
+    const sourceCode = await file.text();
 
-    setError("");
-    setResult(null);
-    setFlowResult(null);
-    setSelectedMethod(null);
-    setSelectedNode(null);
+    const uploadData = new FormData();
+    uploadData.append("file", file);
+
+    const flowData = new FormData();
+    flowData.append("file", file);
+
+    const [analysisResponse, flowResponse] = await Promise.all([
+      fetch(`${API_BASE_URL}/api/analysis/upload`, {
+        method: "POST",
+        body: uploadData,
+      }),
+      fetch(`${API_BASE_URL}/api/analysis/flow`, {
+        method: "POST",
+        body: flowData,
+      }),
+    ]);
+
+    if (!analysisResponse.ok || !flowResponse.ok) {
+      throw new Error(`${file.name} analiz edilemedi.`);
+    }
+
+    const analysis =
+      (await analysisResponse.json()) as WorkspaceFile["analysis"];
+    const flow = (await flowResponse.json()) as FlowAnalysisResult;
+
+    return {
+      id: crypto.randomUUID(),
+      name: file.name,
+      path: file.name,
+      sourceCode,
+      analysis,
+      flow,
+    };
+  }
+
+  async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    if (selectedFiles.length === 0) return;
+
+    event.target.value = "";
     setLoading(true);
-    setSourceCode("");
-    setWorkspaceView("split");
+    setError("");
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      const results = await Promise.allSettled(selectedFiles.map(analyzeFile));
 
-      const code = await file.text();
-      setSourceCode(code);
+      const successfulFiles = results
+        .filter(
+          (result): result is PromiseFulfilledResult<WorkspaceFile> =>
+            result.status === "fulfilled",
+        )
+        .map((result) => result.value);
 
-      const [analysisResponse, flowResponse] = await Promise.all([
-        fetch("http://localhost:5050/api/analysis/upload", {
-          method: "POST",
-          body: formData,
-        }),
-        fetch("http://localhost:5050/api/analysis/flow", {
-          method: "POST",
-          body: formData,
-        }),
-      ]);
+      const failedFiles = results
+        .filter(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected",
+        )
+        .map((result) =>
+          result.reason instanceof Error
+            ? result.reason.message
+            : "Dosya analiz edilemedi.",
+        );
 
-      if (!analysisResponse.ok || !flowResponse.ok)
-        throw new Error("Dosya analiz edilemedi.");
+      if (successfulFiles.length > 0) {
+        setFiles((previous) => [...previous, ...successfulFiles]);
 
-      const analysis: AnalysisResult = await analysisResponse.json();
-      const flow: FlowAnalysisResult = await flowResponse.json();
+        // Yeni yüklenen dosyalardan yalnızca ilkini sekmede aç.
+        setOpenFileIds((previous) => [...previous, successfulFiles[0].id]);
 
-      setResult(analysis);
-      setFlowResult(flow);
+        setActiveFileId(successfulFiles[0].id);
+        setSelectedMethod(null);
+        setSelectedNode(null);
+      }
+
+      if (failedFiles.length > 0) setError(failedFiles.join(" "));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bir hata oluştu.");
     } finally {
       setLoading(false);
-      event.target.value = "";
     }
   }
 
-  function selectMethod(method: MethodInfo) {
-    const flow = flowResult?.methods.find(
+  function selectFile(fileId: string) {
+    setOpenFileIds((previous) =>
+      previous.includes(fileId) ? previous : [...previous, fileId],
+    );
+
+    if (fileId === activeFileId) return;
+
+    setActiveFileId(fileId);
+    setSelectedMethod(null);
+    setSelectedNode(null);
+  }
+
+  function removeFile(fileId: string) {
+    setFiles((previous) => previous.filter((file) => file.id !== fileId));
+
+    const remainingTabs = openFileIds.filter((id) => id !== fileId);
+    setOpenFileIds(remainingTabs);
+
+    if (activeFileId === fileId) {
+      setActiveFileId(remainingTabs[0] ?? null);
+      setSelectedMethod(null);
+      setSelectedNode(null);
+    }
+  }
+
+  function selectMethod(fileId: string, method: MethodInfo) {
+    const file = files.find((item) => item.id === fileId);
+
+    const flow = file?.flow.methods.find(
       (item) =>
         item.name === method.name && item.startLine === method.startLine,
     );
+
+    setOpenFileIds((previous) =>
+      previous.includes(fileId) ? previous : [...previous, fileId],
+    );
+
+    setActiveFileId(fileId);
     setSelectedMethod(flow ?? null);
+    setSelectedNode(null);
+  }
+
+  function closeFileTab(fileId: string) {
+    const remainingTabs = openFileIds.filter((id) => id !== fileId);
+    setOpenFileIds(remainingTabs);
+
+    if (activeFileId !== fileId) return;
+
+    const closedIndex = openFileIds.indexOf(fileId);
+    const nextFileId =
+      remainingTabs[Math.min(closedIndex, remainingTabs.length - 1)] ?? null;
+
+    setActiveFileId(nextFileId);
+    setSelectedMethod(null);
     setSelectedNode(null);
   }
 
   return (
     <div className="app-shell">
-      <TopBar fileName={result?.fileName} />
+      <TopBar />
 
       <div className="app">
         <Sidebar
-          result={result}
+          files={files}
+          activeFileId={activeFileId}
           selectedMethodStartLine={selectedMethod?.startLine}
+          onFileSelect={selectFile}
           onMethodSelect={selectMethod}
+          onFileAdd={openFilePicker}
+          onFileRemove={removeFile}
         />
 
         <main className="main">
@@ -118,11 +210,19 @@ export default function App() {
               ref={fileInputRef}
               type="file"
               accept=".cs"
+              multiple
               onChange={handleUpload}
               hidden
             />
+            <FileTabs
+              files={files.filter((file) => openFileIds.includes(file.id))}
+              activeFileId={activeFileId}
+              onFileSelect={selectFile}
+              onFileRemove={closeFileTab}
+              onFileAdd={openFilePicker}
+            />
 
-            {!result && !loading && (
+            {files.length === 0 && !loading && (
               <div className="workspace-empty">
                 <div className="workspace-empty-icon">
                   <Upload size={28} />
@@ -130,7 +230,7 @@ export default function App() {
 
                 <h2>İlk kod analizini başlat</h2>
                 <p>
-                  C# dosyanı yükle, metotlarını incele ve kontrol akışını
+                  C# dosyalarını yükle, metotlarını incele ve kontrol akışını
                   görselleştir.
                 </p>
 
@@ -140,35 +240,58 @@ export default function App() {
                   onClick={openFilePicker}
                 >
                   <FilePlus2 size={17} />
-                  C# Dosyası Seç
+                  C# Dosyaları Seç
                 </button>
 
-                <span>Desteklenen dosya biçimi: .cs</span>
+                <span>Birden fazla .cs dosyası seçebilirsin.</span>
               </div>
             )}
 
-            {loading && <p>Dosya analiz ediliyor...</p>}
+            {loading && <p>Dosyalar analiz ediliyor...</p>}
             {error && <p className="error">{error}</p>}
 
-            {result && (
+            {activeFile && (
               <div className="analysis-summary">
                 <span className="analysis-summary-dot" />
-                <strong>{result.fileName}</strong>
-                <span>{result.classes.length} sınıf</span>
+                <strong>{activeFile.name}</strong>
+                <span>{activeFile.analysis.classes.length} sınıf</span>
                 <span>
-                  {result.classes.reduce(
+                  {activeFile.analysis.classes.reduce(
                     (sum, cls) => sum + cls.methods.length,
                     0,
                   )}{" "}
                   metot
                 </span>
+                <span>{files.length} dosya yüklendi</span>
                 <span className="analysis-summary-status">
                   Analiz tamamlandı
                 </span>
               </div>
             )}
 
-            {selectedMethod && (
+            {files.length > 0 && !selectedMethod && !loading && (
+              <div className="workspace-empty">
+                <div className="workspace-empty-icon">
+                  <FilePlus2 size={28} />
+                </div>
+                <h2>{activeFile?.name ?? "Açık dosya yok"}</h2>
+                <p>
+                  {activeFile
+                    ? "Akış diyagramını görüntülemek için sol panelden bir metot seç."
+                    : "Project Explorer'dan bir dosya veya metot seçerek çalışmaya devam et."}
+                </p>
+                <button
+                  type="button"
+                  className="workspace-upload-button"
+                  onClick={openFilePicker}
+                >
+                  <FilePlus2 size={17} />
+                  Yeni Dosya Ekle
+                </button>
+              </div>
+            )}
+
+            {selectedMethod && activeFile && (
               <div className="workspace-editor">
                 <WorkspaceToolbar
                   methodName={selectedMethod.name}
@@ -193,7 +316,7 @@ export default function App() {
                       right={
                         <div className="workspace-code-panel">
                           <CodeInspector
-                            code={sourceCode}
+                            code={activeFile.sourceCode}
                             startLine={
                               selectedNode?.startLine ??
                               selectedMethod.startLine
@@ -215,7 +338,7 @@ export default function App() {
                   ) : (
                     <div className="workspace-code-panel">
                       <CodeInspector
-                        code={sourceCode}
+                        code={activeFile.sourceCode}
                         startLine={
                           selectedNode?.startLine ?? selectedMethod.startLine
                         }

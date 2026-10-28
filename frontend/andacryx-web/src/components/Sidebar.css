@@ -190,3 +190,137 @@
   color: #64748b;
   font-size: 11px;
 }
+
+.sidebar-file-group {
+  margin-bottom: 4px;
+}
+
+.sidebar-file-selectable {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+}
+
+.sidebar-file-active {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.sidebar-file-expand,
+.sidebar-file-name {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sidebar-file-expand {
+  padding: 5px 2px;
+  flex-shrink: 0;
+}
+
+.sidebar-file-name {
+  flex: 1;
+  min-width: 0;
+  gap: 8px;
+  padding: 6px 4px;
+  text-align: left;
+}
+
+.sidebar-file-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-file-selectable:hover {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+
+.sidebar-explorer-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 12px;
+}
+
+.sidebar-explorer-heading .sidebar-section-toggle {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-explorer-add,
+.sidebar-file-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  border-radius: 5px;
+  padding: 5px;
+}
+
+.sidebar-explorer-add:hover {
+  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.sidebar-file-remove {
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.sidebar-file-selectable:hover .sidebar-file-remove,
+.sidebar-file-remove:focus-visible {
+  opacity: 1;
+}
+
+.sidebar-file-remove:hover {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.12);
+}
+
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 10px 12px;
+  padding: 8px 10px;
+  background: #0b1220;
+  border: 1px solid #29364b;
+  border-radius: 7px;
+  color: #64748b;
+}
+
+.sidebar-search:focus-within {
+  border-color: #3b82f6;
+}
+
+.sidebar-search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #e2e8f0;
+  font-size: 12px;
+}
+
+.sidebar-search input::placeholder {
+  color: #64748b;
+}
+
+.sidebar-search button {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0;
+}

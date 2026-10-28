@@ -1,7 +1,6 @@
 import {
   Bell,
   ChevronDown,
-  FileCode2,
   Hexagon,
   Moon,
   Search,
@@ -11,26 +10,13 @@ import {
 
 import { APP_CONFIG } from "../config/app.config";
 
-type Props = {
-  fileName?: string;
-};
-
-export default function TopBar({ fileName }: Props) {
+export default function TopBar() {
   return (
     <div className="topbar">
       <div className="topbar-brand">
         <Hexagon size={27} strokeWidth={2.8} />
-        <strong>Andacryx</strong>
+        <strong>{APP_CONFIG.name}</strong>
         <span className="beta-tag">{APP_CONFIG.release}</span>
-      </div>
-
-      <div className="topbar-tabs">
-        {fileName && (
-          <div className="topbar-tab active">
-            <FileCode2 size={15} />
-            <span>{fileName}</span>
-          </div>
-        )}
       </div>
 
       <div className="topbar-actions">

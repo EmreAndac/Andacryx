@@ -495,3 +495,25 @@ $RECYCLE.BIN/
 
 # Local configuration
 *.local
+
+# Andacryx - Local development files
+
+# Local environment configuration
+.env
+.env.local
+.env.*.local
+
+# IDE-specific local settings
+.vs/
+.vscode/settings.json
+
+# Local development overrides
+appsettings.Local.json
+appsettings.*.Local.json
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+backend/Andacryx.Api/Properties/launchSettings.json

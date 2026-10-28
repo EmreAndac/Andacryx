@@ -112,9 +112,9 @@
     font-size: 16px;
   }
 
-  .topbar-actions {
-    gap: 10px;
-  }
+.topbar-actions {
+  margin-left: auto;
+}
 
   .topbar-profile span,
   .topbar-profile svg:last-child,
