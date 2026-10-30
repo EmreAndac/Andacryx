@@ -1,4 +1,4 @@
-import { Code2, Columns2, FilePlus2, Workflow } from "lucide-react";
+import { Code2, Columns2, FilePlus2, FolderOpen, Workflow } from "lucide-react";
 import "./WorkspaceToolbar.css";
 
 export type WorkspaceView = "flow" | "code" | "split";
@@ -8,6 +8,7 @@ type Props = {
   view: WorkspaceView;
   onViewChange: (view: WorkspaceView) => void;
   onOpenFile: () => void;
+  onOpenFolder: () => void;
 };
 
 export default function WorkspaceToolbar({
@@ -15,6 +16,7 @@ export default function WorkspaceToolbar({
   view,
   onViewChange,
   onOpenFile,
+  onOpenFolder,
 }: Props) {
   return (
     <div className="workspace-toolbar">
@@ -65,6 +67,14 @@ export default function WorkspaceToolbar({
           type="button"
           onClick={onOpenFile}
         >
+          <button
+            type="button"
+            className="workspace-folder-button"
+            onClick={onOpenFolder}
+          >
+            <FolderOpen size={17} />
+            Klasör Aç
+          </button>
           <FilePlus2 size={16} />
           Yeni Dosya
         </button>

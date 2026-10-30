@@ -1,5 +1,5 @@
 import { useRef, useState, type ChangeEvent } from "react";
-import { FilePlus2, Upload } from "lucide-react";
+import { FilePlus2, Upload, FolderOpen } from "lucide-react";
 import FlowDiagram, {
   type FlowNodeDto,
   type MethodFlowDto,
@@ -37,6 +37,7 @@ export default function App() {
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("split");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const activeFile = files.find((file) => file.id === activeFileId) ?? null;
 
   const selectedMethod = activeFileId
@@ -48,6 +49,10 @@ export default function App() {
 
   function openFilePicker() {
     fileInputRef.current?.click();
+  }
+
+  function openFolderPicker() {
+    folderInputRef.current?.click();
   }
 
   async function analyzeFile(file: File): Promise<WorkspaceFile> {
@@ -81,16 +86,46 @@ export default function App() {
     return {
       id: crypto.randomUUID(),
       name: file.name,
-      path: file.name,
+      path: file.webkitRelativePath || file.name,
       sourceCode,
       analysis,
       flow,
     };
   }
 
+  function isSupportedFile(file: File) {
+    if (!file.name.toLowerCase().endsWith(".cs")) return false;
+
+    const ignoredFolders = new Set([
+      "bin",
+      "obj",
+      ".git",
+      ".vs",
+      "node_modules",
+      "dist",
+      "build",
+    ]);
+
+    const pathParts = (file.webkitRelativePath || file.name)
+      .replaceAll("\\", "/")
+      .split("/");
+
+    return !pathParts.some((part) => ignoredFolders.has(part.toLowerCase()));
+  }
+
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
-    const selectedFiles = Array.from(event.target.files ?? []);
-    if (selectedFiles.length === 0) return;
+    const selectedFiles = Array.from(event.target.files ?? [])
+      .filter(isSupportedFile)
+      .filter((file) => {
+        const path = file.webkitRelativePath || file.name;
+        return !files.some((existing) => existing.path === path);
+      });
+
+    if (selectedFiles.length === 0) {
+      event.target.value = "";
+      setError("Yeni veya desteklenen C# dosyası bulunamadı.");
+      return;
+    }
 
     event.target.value = "";
     setLoading(true);
@@ -226,6 +261,15 @@ export default function App() {
               onChange={handleUpload}
               hidden
             />
+            <input
+              ref={folderInputRef}
+              type="file"
+              multiple
+              accept=".cs"
+              {...{ webkitdirectory: "", directory: "" }}
+              onChange={handleUpload}
+              hidden
+            />
             <FileTabs
               files={files.filter((file) => openFileIds.includes(file.id))}
               activeFileId={activeFileId}
@@ -253,6 +297,15 @@ export default function App() {
                 >
                   <FilePlus2 size={17} />
                   C# Dosyaları Seç
+                </button>
+
+                <button
+                  type="button"
+                  className="workspace-upload-button"
+                  onClick={openFolderPicker}
+                >
+                  <FolderOpen size={17} />
+                  C# Proje Klasörü Seç
                 </button>
 
                 <span>Birden fazla .cs dosyası seçebilirsin.</span>
@@ -310,6 +363,7 @@ export default function App() {
                   view={workspaceView}
                   onViewChange={setWorkspaceView}
                   onOpenFile={openFilePicker}
+                  onOpenFolder={openFolderPicker}
                 />
 
                 <div
