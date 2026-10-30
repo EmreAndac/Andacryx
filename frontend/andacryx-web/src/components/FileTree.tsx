@@ -31,20 +31,53 @@ export default function FileTree({
 }: Props) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  function isExpanded(id: string, defaultValue = false) {
-    return expanded[id] ?? defaultValue;
+  function isExpanded(id: string) {
+    return expanded[id] ?? false;
   }
 
-  function toggle(id: string, defaultValue = false) {
+  function toggleFolder(node: FileTreeNode) {
+    setExpanded((previous) => {
+      const updated = { ...previous };
+      const willOpen = !isExpanded(node.id);
+
+      if (willOpen) {
+        // Aynı seviyedeki klasörleri kapat.
+        function closeSiblings(nodes: FileTreeNode[]): boolean {
+          if (nodes.some((item) => item.id === node.id)) {
+            for (const sibling of nodes) {
+              if (sibling.type === "folder" && sibling.id !== node.id) {
+                updated[sibling.id] = false;
+              }
+            }
+            return true;
+          }
+
+          for (const item of nodes) {
+            if (item.type === "folder" && closeSiblings(item.children))
+              return true;
+          }
+
+          return false;
+        }
+
+        closeSiblings(nodes);
+      }
+
+      updated[node.id] = willOpen;
+      return updated;
+    });
+  }
+
+  function toggleItem(id: string) {
     setExpanded((previous) => ({
       ...previous,
-      [id]: !isExpanded(id, defaultValue),
+      [id]: !(previous[id] ?? false),
     }));
   }
 
   function renderNode(node: FileTreeNode, depth: number): React.ReactNode {
     if (node.type === "folder") {
-      const open = isExpanded(node.id, true);
+      const open = isExpanded(node.id);
 
       return (
         <div key={node.id} className="tree-group">
@@ -52,7 +85,7 @@ export default function FileTree({
             type="button"
             className="tree-row tree-folder"
             style={{ paddingLeft: 10 + depth * 15 }}
-            onClick={() => toggle(node.id, true)}
+            onClick={() => toggleFolder(node)}
           >
             {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             {open ? <FolderOpen size={16} /> : <Folder size={16} />}
@@ -68,7 +101,7 @@ export default function FileTree({
     if (!file) return null;
 
     const active = file.id === activeFileId;
-    const open = isExpanded(file.id, active);
+    const open = isExpanded(file.id);
 
     return (
       <div key={file.id} className="tree-group">
@@ -79,7 +112,7 @@ export default function FileTree({
           <button
             type="button"
             className="tree-chevron"
-            onClick={() => toggle(file.id, active)}
+            onClick={() => toggleItem(file.id)}
             aria-label="Dosyayı genişlet veya daralt"
           >
             {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -109,7 +142,7 @@ export default function FileTree({
         {open &&
           file.analysis.classes.map((cls, classIndex) => {
             const classKey = `${file.id}:${cls.name}:${classIndex}`;
-            const classOpen = isExpanded(classKey, true);
+            const classOpen = isExpanded(classKey);
 
             return (
               <div className="tree-group" key={classKey}>
@@ -117,7 +150,7 @@ export default function FileTree({
                   type="button"
                   className="tree-row tree-class"
                   style={{ paddingLeft: 25 + depth * 15 }}
-                  onClick={() => toggle(classKey, true)}
+                  onClick={() => toggleItem(classKey)}
                 >
                   {classOpen ? (
                     <ChevronDown size={14} />
