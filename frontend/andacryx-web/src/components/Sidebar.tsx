@@ -1,8 +1,6 @@
 import {
-  Box,
   ChevronDown,
   ChevronRight,
-  FileCode2,
   FolderGit2,
   LayoutDashboard,
   LayoutTemplate,
@@ -13,7 +11,9 @@ import {
   FilePlus2,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import FileTree from "./FileTree";
+import { buildFileTree, type FileTreeNode } from "../utils/fileTree";
 import "./Sidebar.css";
 import { APP_CONFIG } from "../config/app.config";
 import type { WorkspaceFile } from "../types/workspace";
@@ -43,42 +43,29 @@ export default function Sidebar({
 }: Props) {
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [search, setSearch] = useState("");
-  const [expandedFiles, setExpandedFiles] = useState<Record<string, boolean>>(
-    {},
-  );
-  const [expandedClasses, setExpandedClasses] = useState<
-    Record<string, boolean>
-  >({});
 
-  const sortedFiles = [...files]
-    .filter((file) =>
-      file.name
-        .toLocaleLowerCase("tr")
-        .includes(search.toLocaleLowerCase("tr")),
-    )
-    .sort((a, b) => a.name.localeCompare(b.name, "tr"));
+  const tree = useMemo(() => buildFileTree(files), [files]);
 
-  function isFileExpanded(fileId: string) {
-    return expandedFiles[fileId] ?? fileId === activeFileId;
-  }
+  const filteredTree = useMemo(() => {
+    const query = search.toLocaleLowerCase("tr").trim();
+    if (!query) return tree;
 
-  function toggleFile(fileId: string) {
-    setExpandedFiles((previous) => ({
-      ...previous,
-      [fileId]: !isFileExpanded(fileId),
-    }));
-  }
+    function filterNodes(nodes: FileTreeNode[]): FileTreeNode[] {
+      return nodes.flatMap((node) => {
+        if (node.name.toLocaleLowerCase("tr").includes(query)) {
+          return [node];
+        }
 
-  function isClassExpanded(classKey: string) {
-    return expandedClasses[classKey] ?? true;
-  }
+        if (node.type === "file") return [];
 
-  function toggleClass(classKey: string) {
-    setExpandedClasses((previous) => ({
-      ...previous,
-      [classKey]: !isClassExpanded(classKey),
-    }));
-  }
+        const children = filterNodes(node.children);
+
+        return children.length > 0 ? [{ ...node, children }] : [];
+      });
+    }
+
+    return filterNodes(tree);
+  }, [tree, search]);
 
   return (
     <aside className="sidebar">
@@ -156,11 +143,12 @@ export default function Sidebar({
               <Search size={15} />
               <input
                 type="text"
-                placeholder="Dosya ara..."
+                placeholder="Dosya veya klasör ara..."
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                aria-label="Dosya ara"
+                aria-label="Dosya veya klasör ara"
               />
+
               {search && (
                 <button
                   type="button"
@@ -177,107 +165,22 @@ export default function Sidebar({
             <p className="sidebar-empty">Henüz dosya yüklenmedi.</p>
           )}
 
-          {files.length > 0 && sortedFiles.length === 0 && (
-            <p className="sidebar-empty">Eşleşen dosya bulunamadı.</p>
+          {files.length > 0 && filteredTree.length === 0 && (
+            <p className="sidebar-empty">
+              Eşleşen dosya veya klasör bulunamadı.
+            </p>
           )}
 
-          {sortedFiles.map((file) => {
-            const fileExpanded = isFileExpanded(file.id);
-            const active = file.id === activeFileId;
-
-            return (
-              <div className="sidebar-file-group" key={file.id}>
-                <div
-                  className={`sidebar-file sidebar-file-selectable ${active ? "sidebar-file-active" : ""}`}
-                >
-                  <button
-                    type="button"
-                    className="sidebar-file-expand"
-                    onClick={() => toggleFile(file.id)}
-                    aria-label={`${file.name} ${fileExpanded ? "daralt" : "genişlet"}`}
-                    aria-expanded={fileExpanded}
-                  >
-                    {fileExpanded ? (
-                      <ChevronDown size={14} />
-                    ) : (
-                      <ChevronRight size={14} />
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    className="sidebar-file-name"
-                    onClick={() => {
-                      onFileSelect(file.id);
-                      setExpandedFiles((previous) => ({
-                        ...previous,
-                        [file.id]: true,
-                      }));
-                    }}
-                  >
-                    <FileCode2 size={17} />
-                    <span title={file.path}>{file.name}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="sidebar-file-remove"
-                    onClick={() => onFileRemove(file.id)}
-                    title={`${file.name} dosyasını kaldır`}
-                    aria-label={`${file.name} dosyasını kaldır`}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-
-                {fileExpanded &&
-                  file.analysis.classes.map((cls, classIndex) => {
-                    const classKey = `${file.id}-${cls.name}-${classIndex}`;
-                    const expanded = isClassExpanded(classKey);
-
-                    return (
-                      <div className="sidebar-class" key={classKey}>
-                        <button
-                          className="sidebar-class-toggle"
-                          type="button"
-                          onClick={() => toggleClass(classKey)}
-                          aria-expanded={expanded}
-                        >
-                          {expanded ? (
-                            <ChevronDown size={14} />
-                          ) : (
-                            <ChevronRight size={14} />
-                          )}
-                          <Box size={15} />
-                          <span title={cls.name}>{cls.name}</span>
-                        </button>
-
-                        {expanded && (
-                          <div className="sidebar-methods">
-                            {cls.methods.map((method, methodIndex) => (
-                              <button
-                                key={`${method.name}-${method.startLine}-${methodIndex}`}
-                                type="button"
-                                className={`sidebar-method ${
-                                  active &&
-                                  selectedMethodStartLine === method.startLine
-                                    ? "sidebar-method-active"
-                                    : ""
-                                }`}
-                                onClick={() => onMethodSelect(file.id, method)}
-                              >
-                                <span>{method.name}()</span>
-                                <small>Satır {method.startLine}</small>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-              </div>
-            );
-          })}
+          {filteredTree.length > 0 && (
+            <FileTree
+              nodes={filteredTree}
+              activeFileId={activeFileId}
+              selectedMethodStartLine={selectedMethodStartLine}
+              onFileSelect={onFileSelect}
+              onMethodSelect={onMethodSelect}
+              onFileRemove={onFileRemove}
+            />
+          )}
         </div>
       )}
 
@@ -290,6 +193,7 @@ export default function Sidebar({
           <span>Settings</span>
           <small>Soon</small>
         </div>
+
         <span>
           {APP_CONFIG.name} · {APP_CONFIG.release} v{APP_CONFIG.version}
         </span>

@@ -1,0 +1,128 @@
+
+.file-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tree-group {
+  min-width: 0;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #cbd5e1;
+  text-align: left;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tree-row:hover {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.tree-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-folder > svg:nth-child(2) {
+  color: #eab308;
+  flex-shrink: 0;
+}
+
+.tree-class > svg:nth-child(2) {
+  color: #a78bfa;
+  flex-shrink: 0;
+}
+
+.tree-file > .tree-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.tree-file-name {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: 7px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tree-file-name svg {
+  flex-shrink: 0;
+  color: #60a5fa;
+}
+
+.tree-active {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+}
+
+.tree-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #94a3b8;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.tree-file:hover .tree-remove,
+.tree-remove:focus-visible {
+  opacity: 1;
+}
+
+.tree-remove:hover {
+  background: rgba(248, 113, 113, 0.12);
+  color: #f87171;
+}
+
+.tree-method {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.tree-method small {
+  color: #64748b;
+  font-size: 10px;
+}
+
+.tree-method-active {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
