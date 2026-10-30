@@ -375,6 +375,7 @@ export default function App() {
                         <div className="workspace-diagram-panel">
                           <FlowDiagram
                             method={selectedMethod}
+                            diagramKey={`${activeFile.id}:${selectedMethod.startLine}:${selectedMethod.name}`}
                             onNodeSelect={(node) => {
                               if (!activeFileId) return;
                               setSelectedNodes((previous) => ({
@@ -404,6 +405,7 @@ export default function App() {
                     <div className="workspace-diagram-panel">
                       <FlowDiagram
                         method={selectedMethod}
+                        diagramKey={`${activeFile.id}:${selectedMethod.startLine}:${selectedMethod.name}`}
                         onNodeSelect={(node) => {
                           if (!activeFileId) return;
                           setSelectedNodes((previous) => ({

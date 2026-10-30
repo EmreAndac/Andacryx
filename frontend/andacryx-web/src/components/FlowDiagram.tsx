@@ -6,6 +6,8 @@ import {
   MarkerType,
   useNodesInitialized,
   useReactFlow,
+  useNodesState,
+  type XYPosition,
   type Node,
   type Edge,
 } from "@xyflow/react";
@@ -16,6 +18,7 @@ import FlowEdge from "./FlowEdge";
 
 const elk = new ELK();
 const NODE_WIDTH = 240;
+const savedNodePositions = new Map<string, Record<string, XYPosition>>();
 
 function getNodeHeight(type: string) {
   if (type === "condition") return 130;
@@ -50,6 +53,7 @@ export type MethodFlowDto = {
 
 type Props = {
   method: MethodFlowDto;
+  diagramKey: string;
   onNodeSelect: (node: FlowNodeDto) => void;
 };
 
@@ -67,8 +71,12 @@ function AutoFit({ ready }: { ready: boolean }) {
 const nodeTypes = { flowNode: FlowNode };
 const edgeTypes = { flowEdge: FlowEdge };
 
-export default function FlowDiagram({ method, onNodeSelect }: Props) {
-  const [nodes, setNodes] = useState<Node[]>([]);
+export default function FlowDiagram({
+  method,
+  diagramKey,
+  onNodeSelect,
+}: Props) {
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [layoutReady, setLayoutReady] = useState(false);
 
   const nodeMap = useMemo(
@@ -193,14 +201,18 @@ export default function FlowDiagram({ method, onNodeSelect }: Props) {
         const layout = await elk.layout(graph);
         if (cancelled) return;
 
+        const savedPositions = savedNodePositions.get(diagramKey);
+
         const positionedNodes: Node[] = method.nodes.map((node) => {
           const position = layout.children?.find((item) => item.id === node.id);
+          const defaultPosition = { x: position?.x ?? 0, y: position?.y ?? 0 };
 
           return {
             id: node.id,
             type: "flowNode",
-            position: { x: position?.x ?? 0, y: position?.y ?? 0 },
+            position: savedPositions?.[node.id] ?? defaultPosition,
             data: { label: node.label, kind: node.type },
+            draggable: true,
           };
         });
 
@@ -216,7 +228,20 @@ export default function FlowDiagram({ method, onNodeSelect }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [method]);
+  }, [method, diagramKey, setNodes]);
+
+  function handleNodeDragStop() {
+    setNodes((currentNodes) => {
+      const positions: Record<string, XYPosition> = {};
+
+      for (const node of currentNodes) {
+        positions[node.id] = { ...node.position };
+      }
+
+      savedNodePositions.set(diagramKey, positions);
+      return currentNodes;
+    });
+  }
 
   return (
     <div style={{ height: 700, width: "100%", position: "relative" }}>
@@ -226,6 +251,9 @@ export default function FlowDiagram({ method, onNodeSelect }: Props) {
         key={`${method.name}-${method.startLine}`}
         nodes={nodes}
         nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
+        nodesDraggable={true}
+        onNodeDragStop={handleNodeDragStop}
         edges={edges}
         edgeTypes={edgeTypes}
         fitView
