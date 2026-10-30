@@ -9,6 +9,8 @@ import {
   Workflow,
   Search,
   FilePlus2,
+  ChevronsDownUp,
+  LocateFixed,
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -43,6 +45,8 @@ export default function Sidebar({
 }: Props) {
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [search, setSearch] = useState("");
+  const [collapseVersion, setCollapseVersion] = useState(0);
+  const [revealVersion, setRevealVersion] = useState(0);
 
   const tree = useMemo(() => buildFileTree(files), [files]);
 
@@ -128,6 +132,30 @@ export default function Sidebar({
         <button
           type="button"
           className="sidebar-explorer-add"
+          onClick={() => setCollapseVersion((previous) => previous + 1)}
+          title="Tümünü daralt"
+          aria-label="Tümünü daralt"
+        >
+          <ChevronsDownUp size={16} />
+        </button>
+
+        <button
+          type="button"
+          className="sidebar-explorer-add"
+          onClick={() => {
+            setSearch("");
+            setRevealVersion((previous) => previous + 1);
+          }}
+          title="Aktif dosyayı göster"
+          aria-label="Aktif dosyayı göster"
+          disabled={!activeFileId}
+        >
+          <LocateFixed size={16} />
+        </button>
+
+        <button
+          type="button"
+          className="sidebar-explorer-add"
           onClick={onFileAdd}
           title="C# dosyası ekle"
           aria-label="C# dosyası ekle"
@@ -176,6 +204,9 @@ export default function Sidebar({
               nodes={filteredTree}
               activeFileId={activeFileId}
               selectedMethodStartLine={selectedMethodStartLine}
+              search={search}
+              collapseVersion={collapseVersion}
+              revealVersion={revealVersion}
               onFileSelect={onFileSelect}
               onMethodSelect={onMethodSelect}
               onFileRemove={onFileRemove}

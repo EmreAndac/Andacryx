@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   ChevronDown,
@@ -16,6 +16,9 @@ type Props = {
   nodes: FileTreeNode[];
   activeFileId: string | null;
   selectedMethodStartLine?: number;
+  search?: string;
+  collapseVersion?: number;
+  revealVersion?: number;
   onFileSelect: (fileId: string) => void;
   onMethodSelect: (fileId: string, method: MethodInfo) => void;
   onFileRemove: (fileId: string) => void;
@@ -25,46 +28,130 @@ export default function FileTree({
   nodes,
   activeFileId,
   selectedMethodStartLine,
+  search = "",
+  collapseVersion = 0,
+  revealVersion = 0,
   onFileSelect,
   onMethodSelect,
   onFileRemove,
 }: Props) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [forcedClosed, setForcedClosed] = useState(false);
+
+  const searching = search.trim().length > 0;
+
+  const searchExpanded = useMemo(() => {
+    const result = new Set<string>();
+
+    if (!searching) return result;
+
+    function visit(items: FileTreeNode[]) {
+      for (const node of items) {
+        if (node.type !== "folder") continue;
+
+        if (node.children.length > 0) {
+          result.add(node.id);
+          visit(node.children);
+        }
+      }
+    }
+
+    visit(nodes);
+    return result;
+  }, [nodes, searching]);
+
+  useEffect(() => {
+    if (collapseVersion === 0) return;
+    setExpanded({});
+    setForcedClosed(true);
+  }, [collapseVersion]);
+
+  useEffect(() => {
+    if (revealVersion === 0 || !activeFileId) return;
+
+    const path: string[] = [];
+
+    function findPath(items: FileTreeNode[], parents: string[]): boolean {
+      for (const node of items) {
+        if (node.type === "file" && node.id === activeFileId) {
+          path.push(...parents, node.id);
+          return true;
+        }
+
+        if (
+          node.type === "folder" &&
+          findPath(node.children, [...parents, node.id])
+        ) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    if (!findPath(nodes, [])) return;
+
+    setForcedClosed(false);
+    setExpanded((previous) => {
+      const next = { ...previous };
+
+      // Aktif dosyanın dalını açarken diğer dalları kapat.
+      function closeOtherBranches(items: FileTreeNode[], level: number) {
+        const selectedId = path[level];
+
+        for (const node of items) {
+          if (node.type === "folder") {
+            next[node.id] = node.id === selectedId;
+
+            if (node.id === selectedId) {
+              closeOtherBranches(node.children, level + 1);
+            }
+          }
+        }
+      }
+
+      closeOtherBranches(nodes, 0);
+
+      for (const id of path) next[id] = true;
+      return next;
+    });
+  }, [revealVersion, activeFileId, nodes]);
 
   function isExpanded(id: string) {
+    if (searching && searchExpanded.has(id)) return true;
     return expanded[id] ?? false;
   }
 
   function toggleFolder(node: FileTreeNode) {
+    if (searching) return;
+
+    setForcedClosed(false);
     setExpanded((previous) => {
-      const updated = { ...previous };
-      const willOpen = !isExpanded(node.id);
+      const next = { ...previous };
+      const willOpen = !(previous[node.id] ?? false);
 
-      if (willOpen) {
-        // Aynı seviyedeki klasörleri kapat.
-        function closeSiblings(nodes: FileTreeNode[]): boolean {
-          if (nodes.some((item) => item.id === node.id)) {
-            for (const sibling of nodes) {
-              if (sibling.type === "folder" && sibling.id !== node.id) {
-                updated[sibling.id] = false;
-              }
+      function closeSiblings(items: FileTreeNode[]): boolean {
+        if (items.some((item) => item.id === node.id)) {
+          for (const sibling of items) {
+            if (sibling.type === "folder" && sibling.id !== node.id) {
+              next[sibling.id] = false;
             }
-            return true;
           }
-
-          for (const item of nodes) {
-            if (item.type === "folder" && closeSiblings(item.children))
-              return true;
-          }
-
-          return false;
+          return true;
         }
 
-        closeSiblings(nodes);
+        for (const item of items) {
+          if (item.type === "folder" && closeSiblings(item.children)) {
+            return true;
+          }
+        }
+
+        return false;
       }
 
-      updated[node.id] = willOpen;
-      return updated;
+      if (willOpen) closeSiblings(nodes);
+      next[node.id] = willOpen;
+      return next;
     });
   }
 
@@ -86,6 +173,7 @@ export default function FileTree({
             className="tree-row tree-folder"
             style={{ paddingLeft: 10 + depth * 15 }}
             onClick={() => toggleFolder(node)}
+            aria-expanded={open}
           >
             {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             {open ? <FolderOpen size={16} /> : <Folder size={16} />}
@@ -114,6 +202,7 @@ export default function FileTree({
             className="tree-chevron"
             onClick={() => toggleItem(file.id)}
             aria-label="Dosyayı genişlet veya daralt"
+            aria-expanded={open}
           >
             {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
@@ -151,6 +240,7 @@ export default function FileTree({
                   className="tree-row tree-class"
                   style={{ paddingLeft: 25 + depth * 15 }}
                   onClick={() => toggleItem(classKey)}
+                  aria-expanded={classOpen}
                 >
                   {classOpen ? (
                     <ChevronDown size={14} />
@@ -166,7 +256,11 @@ export default function FileTree({
                     <button
                       key={`${method.name}:${method.startLine}:${index}`}
                       type="button"
-                      className={`tree-row tree-method ${active && selectedMethodStartLine === method.startLine ? "tree-method-active" : ""}`}
+                      className={`tree-row tree-method ${
+                        active && selectedMethodStartLine === method.startLine
+                          ? "tree-method-active"
+                          : ""
+                      }`}
                       style={{ paddingLeft: 43 + depth * 15 }}
                       onClick={() => onMethodSelect(file.id, method)}
                     >
@@ -182,6 +276,8 @@ export default function FileTree({
   }
 
   return (
-    <div className="file-tree">{nodes.map((node) => renderNode(node, 0))}</div>
+    <div className="file-tree" data-collapsed={forcedClosed}>
+      {nodes.map((node) => renderNode(node, 0))}
+    </div>
   );
 }

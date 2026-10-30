@@ -324,3 +324,19 @@
   cursor: pointer;
   padding: 0;
 }
+
+.sidebar-explorer-add:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.sidebar-explorer-heading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sidebar-explorer-heading .sidebar-section-toggle {
+  flex: 1;
+  min-width: 0;
+}
