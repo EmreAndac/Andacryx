@@ -26,16 +26,25 @@ export default function App() {
   const [files, setFiles] = useState<WorkspaceFile[]>([]);
   const [openFileIds, setOpenFileIds] = useState<string[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
-  const [selectedMethod, setSelectedMethod] = useState<MethodFlowDto | null>(
-    null,
-  );
-  const [selectedNode, setSelectedNode] = useState<FlowNodeDto | null>(null);
+  const [selectedMethods, setSelectedMethods] = useState<
+    Record<string, MethodFlowDto | null>
+  >({});
+  const [selectedNodes, setSelectedNodes] = useState<
+    Record<string, FlowNodeDto | null>
+  >({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("split");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeFile = files.find((file) => file.id === activeFileId) ?? null;
+
+  const selectedMethod = activeFileId
+    ? (selectedMethods[activeFileId] ?? null)
+    : null;
+  const selectedNode = activeFileId
+    ? (selectedNodes[activeFileId] ?? null)
+    : null;
 
   function openFilePicker() {
     fileInputRef.current?.click();
@@ -115,8 +124,6 @@ export default function App() {
         setOpenFileIds((previous) => [...previous, successfulFiles[0].id]);
 
         setActiveFileId(successfulFiles[0].id);
-        setSelectedMethod(null);
-        setSelectedNode(null);
       }
 
       if (failedFiles.length > 0) setError(failedFiles.join(" "));
@@ -135,20 +142,27 @@ export default function App() {
     if (fileId === activeFileId) return;
 
     setActiveFileId(fileId);
-    setSelectedMethod(null);
-    setSelectedNode(null);
   }
-
   function removeFile(fileId: string) {
     setFiles((previous) => previous.filter((file) => file.id !== fileId));
 
     const remainingTabs = openFileIds.filter((id) => id !== fileId);
     setOpenFileIds(remainingTabs);
 
+    setSelectedMethods((previous) => {
+      const updated = { ...previous };
+      delete updated[fileId];
+      return updated;
+    });
+
+    setSelectedNodes((previous) => {
+      const updated = { ...previous };
+      delete updated[fileId];
+      return updated;
+    });
+
     if (activeFileId === fileId) {
       setActiveFileId(remainingTabs[0] ?? null);
-      setSelectedMethod(null);
-      setSelectedNode(null);
     }
   }
 
@@ -165,8 +179,8 @@ export default function App() {
     );
 
     setActiveFileId(fileId);
-    setSelectedMethod(flow ?? null);
-    setSelectedNode(null);
+    setSelectedMethods((previous) => ({ ...previous, [fileId]: flow ?? null }));
+    setSelectedNodes((previous) => ({ ...previous, [fileId]: null }));
   }
 
   function closeFileTab(fileId: string) {
@@ -180,8 +194,6 @@ export default function App() {
       remainingTabs[Math.min(closedIndex, remainingTabs.length - 1)] ?? null;
 
     setActiveFileId(nextFileId);
-    setSelectedMethod(null);
-    setSelectedNode(null);
   }
 
   return (
@@ -309,7 +321,13 @@ export default function App() {
                         <div className="workspace-diagram-panel">
                           <FlowDiagram
                             method={selectedMethod}
-                            onNodeSelect={setSelectedNode}
+                            onNodeSelect={(node) => {
+                              if (!activeFileId) return;
+                              setSelectedNodes((previous) => ({
+                                ...previous,
+                                [activeFileId]: node,
+                              }));
+                            }}
                           />
                         </div>
                       }
@@ -332,7 +350,13 @@ export default function App() {
                     <div className="workspace-diagram-panel">
                       <FlowDiagram
                         method={selectedMethod}
-                        onNodeSelect={setSelectedNode}
+                        onNodeSelect={(node) => {
+                          if (!activeFileId) return;
+                          setSelectedNodes((previous) => ({
+                            ...previous,
+                            [activeFileId]: node,
+                          }));
+                        }}
                       />
                     </div>
                   ) : (

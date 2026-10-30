@@ -122,3 +122,20 @@
     display: none;
   }
 }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.topbar-brand {
+  flex-shrink: 0;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  gap: 20px;
+}
