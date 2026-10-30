@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { FilePlus2, Upload, FolderOpen } from "lucide-react";
 import FlowDiagram, {
   type FlowNodeDto,
@@ -19,6 +19,7 @@ import WorkspaceToolbar, {
   type WorkspaceView,
 } from "./components/WorkspaceToolbar";
 import type { WorkspaceFile, FlowAnalysisResult } from "./types/workspace";
+import { loadWorkspace, saveWorkspace, type WorkspaceSnapshot } from "./services/workspaceStorage";
 
 const API_BASE_URL = "http://localhost:5050";
 
@@ -35,6 +36,9 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("split");
+  const [workspaceReady, setWorkspaceReady] = useState(false);
+  const [diagramPositions, setDiagramPositions] = useState<WorkspaceSnapshot["diagramPositions"]>({});
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -46,6 +50,78 @@ export default function App() {
   const selectedNode = activeFileId
     ? (selectedNodes[activeFileId] ?? null)
     : null;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restoreWorkspace() {
+      try {
+        const snapshot = await loadWorkspace();
+        if (cancelled || !snapshot) return;
+
+        const restoredFiles = snapshot.files ?? [];
+        const validIds = new Set(restoredFiles.map(file => file.id));
+        const restoredTabs = (snapshot.openFileIds ?? []).filter(id => validIds.has(id));
+        const restoredActiveId = snapshot.activeFileId && restoredTabs.includes(snapshot.activeFileId)
+          ? snapshot.activeFileId : restoredTabs[0] ?? null;
+        const restoredMethods: Record<string, MethodFlowDto | null> = {};
+
+        for (const file of restoredFiles) {
+          const line = snapshot.selectedMethodLines?.[file.id];
+          if (line !== undefined) {
+            restoredMethods[file.id] = file.flow.methods.find(method => method.startLine === line) ?? null;
+          }
+        }
+
+        setFiles(restoredFiles);
+        setOpenFileIds(restoredTabs);
+        setActiveFileId(restoredActiveId);
+        setSelectedMethods(restoredMethods);
+        setWorkspaceView(snapshot.workspaceView ?? "split");
+        setDiagramPositions(snapshot.diagramPositions ?? {});
+      } catch (err) {
+        if (!cancelled) setError(`Çalışma alanı geri yüklenemedi: ${err instanceof Error ? err.message : "Bilinmeyen hata"}`);
+      } finally {
+        if (!cancelled) setWorkspaceReady(true);
+      }
+    }
+
+    void restoreWorkspace();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!workspaceReady) return;
+
+    const selectedMethodLines: Record<string, number> = {};
+    for (const [fileId, method] of Object.entries(selectedMethods)) {
+      if (method) selectedMethodLines[fileId] = method.startLine;
+    }
+
+    const snapshot: WorkspaceSnapshot = {
+      version: 1,
+      files,
+      openFileIds,
+      activeFileId,
+      selectedMethodLines,
+      workspaceView,
+      diagramPositions,
+    };
+
+    const timeout = window.setTimeout(() => {
+      // Kaydetme işlemlerini sıraya alarak eski verinin yenisini ezmesini önle.
+      saveQueueRef.current = saveQueueRef.current
+        .catch(() => undefined)
+        .then(() => saveWorkspace(snapshot))
+        .catch(err => console.error("Workspace save failed:", err));
+    }, 400);
+
+    return () => window.clearTimeout(timeout);
+  }, [workspaceReady, files, openFileIds, activeFileId, selectedMethods, workspaceView, diagramPositions]);
+
+  function handlePositionsChange(key: string, positions: Record<string, { x: number; y: number }>) {
+    setDiagramPositions(previous => ({ ...previous, [key]: positions }));
+  }
 
   function openFilePicker() {
     fileInputRef.current?.click();
@@ -196,6 +272,10 @@ export default function App() {
       return updated;
     });
 
+    setDiagramPositions(previous => Object.fromEntries(
+      Object.entries(previous).filter(([key]) => !key.startsWith(`${fileId}:`))
+    ));
+
     if (activeFileId === fileId) {
       setActiveFileId(remainingTabs[0] ?? null);
     }
@@ -235,7 +315,9 @@ export default function App() {
     <div className="app-shell">
       <TopBar />
 
-      <div className="app">
+      {!workspaceReady ? (
+        <div className="workspace-empty" role="status">Çalışma alanı yükleniyor...</div>
+      ) : <div className="app">
         <Sidebar
           files={files}
           activeFileId={activeFileId}
@@ -376,6 +458,8 @@ export default function App() {
                           <FlowDiagram
                             method={selectedMethod}
                             diagramKey={`${activeFile.id}:${selectedMethod.startLine}:${selectedMethod.name}`}
+                            initialPositions={diagramPositions[`${activeFile.id}:${selectedMethod.startLine}:${selectedMethod.name}`]}
+                            onPositionsChange={handlePositionsChange}
                             onNodeSelect={(node) => {
                               if (!activeFileId) return;
                               setSelectedNodes((previous) => ({
@@ -406,6 +490,8 @@ export default function App() {
                       <FlowDiagram
                         method={selectedMethod}
                         diagramKey={`${activeFile.id}:${selectedMethod.startLine}:${selectedMethod.name}`}
+                        initialPositions={diagramPositions[`${activeFile.id}:${selectedMethod.startLine}:${selectedMethod.name}`]}
+                        onPositionsChange={handlePositionsChange}
                         onNodeSelect={(node) => {
                           if (!activeFileId) return;
                           setSelectedNodes((previous) => ({
@@ -433,7 +519,7 @@ export default function App() {
             )}
           </section>
         </main>
-      </div>
+      </div>}
     </div>
   );
 }

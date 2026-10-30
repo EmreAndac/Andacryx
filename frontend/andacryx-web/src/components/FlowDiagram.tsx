@@ -54,6 +54,11 @@ export type MethodFlowDto = {
 type Props = {
   method: MethodFlowDto;
   diagramKey: string;
+  initialPositions?: Record<string, XYPosition>;
+  onPositionsChange?: (
+    diagramKey: string,
+    positions: Record<string, XYPosition>,
+  ) => void;
   onNodeSelect: (node: FlowNodeDto) => void;
 };
 
@@ -75,6 +80,8 @@ export default function FlowDiagram({
   method,
   diagramKey,
   onNodeSelect,
+  initialPositions,
+  onPositionsChange,
 }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [layoutReady, setLayoutReady] = useState(false);
@@ -201,7 +208,8 @@ export default function FlowDiagram({
         const layout = await elk.layout(graph);
         if (cancelled) return;
 
-        const savedPositions = savedNodePositions.get(diagramKey);
+        const savedPositions =
+          savedNodePositions.get(diagramKey) ?? initialPositions;
 
         const positionedNodes: Node[] = method.nodes.map((node) => {
           const position = layout.children?.find((item) => item.id === node.id);
@@ -239,6 +247,7 @@ export default function FlowDiagram({
       }
 
       savedNodePositions.set(diagramKey, positions);
+      onPositionsChange?.(diagramKey, positions);
       return currentNodes;
     });
   }
