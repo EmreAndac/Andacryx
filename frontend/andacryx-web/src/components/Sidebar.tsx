@@ -26,6 +26,8 @@ export type AnalysisResult = { fileName: string; classes: ClassInfo[] };
 
 type Props = {
   files: WorkspaceFile[];
+  activePage: "overview" | "projects";
+  onPageChange: (page: "overview" | "projects") => void;
   activeFileId: string | null;
   selectedMethodStartLine?: number;
   onFileSelect: (fileId: string) => void;
@@ -36,6 +38,8 @@ type Props = {
 
 export default function Sidebar({
   files,
+  activePage,
+  onPageChange,
   activeFileId,
   selectedMethodStartLine,
   onFileSelect,
@@ -79,19 +83,15 @@ export default function Sidebar({
       </div>
 
       <nav className="sidebar-navigation" aria-label="Workspace navigation">
-        <div className="sidebar-nav-item sidebar-nav-active">
+        <button type="button" className={`sidebar-nav-item ${activePage === "overview" ? "sidebar-nav-active" : ""}`} onClick={() => onPageChange("overview")} aria-current={activePage === "overview" ? "page" : undefined}>
           <LayoutDashboard size={17} />
           <span>Overview</span>
-        </div>
+        </button>
 
-        <div
-          className="sidebar-nav-item sidebar-nav-disabled"
-          title="Coming soon"
-        >
+        <button type="button" className={`sidebar-nav-item ${activePage === "projects" ? "sidebar-nav-active" : ""}`} onClick={() => onPageChange("projects")} aria-current={activePage === "projects" ? "page" : undefined}>
           <FolderGit2 size={17} />
           <span>My Projects</span>
-          <small>Soon</small>
-        </div>
+        </button>
 
         <div
           className="sidebar-nav-item sidebar-nav-disabled"
@@ -112,9 +112,9 @@ export default function Sidebar({
         </div>
       </nav>
 
-      <div className="sidebar-divider" />
+      <div className="sidebar-divider" style={{ display: activePage === "overview" ? undefined : "none" }} />
 
-      <div className="sidebar-explorer-heading">
+      <div className="sidebar-explorer-heading" style={{ display: activePage === "overview" ? undefined : "none" }}>
         <button
           className="sidebar-section-heading sidebar-section-toggle"
           type="button"
@@ -164,7 +164,7 @@ export default function Sidebar({
         </button>
       </div>
 
-      {explorerOpen && (
+      {explorerOpen && activePage === "overview" && (
         <div className="sidebar-explorer">
           {files.length > 0 && (
             <div className="sidebar-search">

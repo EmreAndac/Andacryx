@@ -340,3 +340,8 @@
   flex: 1;
   min-width: 0;
 }
+/* v0.9.1.2: clickable workspace navigation */
+.sidebar-navigation button.sidebar-nav-item { width: 100%; border: 0; font-family: inherit; text-align: left; background: transparent; cursor: pointer; }
+.sidebar-navigation button.sidebar-nav-item:hover { background: rgba(59,130,246,.10); }
+.sidebar-navigation button.sidebar-nav-active { background: #1e3a5f; }
+.sidebar-navigation button.sidebar-nav-item:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }

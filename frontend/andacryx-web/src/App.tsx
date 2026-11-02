@@ -20,10 +20,12 @@ import WorkspaceToolbar, {
 } from "./components/WorkspaceToolbar";
 import type { WorkspaceFile, FlowAnalysisResult } from "./types/workspace";
 import { loadWorkspace, saveWorkspace, type WorkspaceSnapshot } from "./services/workspaceStorage";
+import MyProjects from "./components/MyProjects";
 
 const API_BASE_URL = "http://localhost:5050";
 
 export default function App() {
+  const [activePage, setActivePage] = useState<"overview" | "projects">("overview");
   const [files, setFiles] = useState<WorkspaceFile[]>([]);
   const [openFileIds, setOpenFileIds] = useState<string[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
@@ -319,6 +321,8 @@ export default function App() {
         <div className="workspace-empty" role="status">Çalışma alanı yükleniyor...</div>
       ) : <div className="app">
         <Sidebar
+          activePage={activePage}
+          onPageChange={setActivePage}
           files={files}
           activeFileId={activeFileId}
           selectedMethodStartLine={selectedMethod?.startLine}
@@ -330,10 +334,13 @@ export default function App() {
 
         <main className="main">
           <header>
-            <h1>Code Flow Explorer</h1>
+            <h1>{activePage === "projects" ? "My Projects" : "Code Flow Explorer"}</h1>
             <span>v{APP_CONFIG.version}</span>
           </header>
 
+          {activePage === "projects" ? (
+            <MyProjects onBack={() => setActivePage("overview")} />
+          ) : (
           <section className="workspace">
             <input
               ref={fileInputRef}
@@ -518,6 +525,7 @@ export default function App() {
               </div>
             )}
           </section>
+          )}
         </main>
       </div>}
     </div>

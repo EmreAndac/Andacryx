@@ -1,0 +1,16 @@
+.my-projects { flex: 1; min-height: 0; overflow-y: auto; padding: 26px 30px; color: #e2e8f0; }
+.my-projects-top { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+.my-projects-top h2 { margin: 0 0 6px; font-size: 19px; }
+.my-projects-top p, .my-projects-card p { margin: 0; color: #94a3b8; font-size: 13px; }
+.my-projects-action { display: inline-flex; align-items: center; gap: 8px; border: 1px solid #334155; background: #1e293b; border-radius: 8px; padding: 10px 14px; color: #dbeafe; cursor: pointer; font: inherit; font-size: 13px; }
+.my-projects-action:hover { border-color: #60a5fa; }
+.my-projects-empty { max-width: 550px; margin: 60px auto; text-align: center; padding: 40px 30px; border: 1px dashed #334155; border-radius: 14px; background: #0f172a; }
+.my-projects-empty > svg { color: #60a5fa; }
+.my-projects-empty h3 { margin: 16px 0 8px; }
+.my-projects-empty p { color: #94a3b8; line-height: 1.6; margin-bottom: 20px; }
+.my-projects-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(250px,1fr)); gap: 16px; }
+.my-projects-card { padding: 20px; border: 1px solid #334155; border-radius: 12px; background: #111c2e; display: flex; flex-direction: column; gap: 12px; }
+.my-projects-card-title { display: flex; align-items: center; gap: 12px; }
+.my-projects-card-title svg { color: #60a5fa; flex-shrink: 0; }
+.my-projects-card-title h3 { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
+.my-projects-local { display: inline-flex; align-items: center; gap: 6px; color: #93c5fd; font-size: 12px; }

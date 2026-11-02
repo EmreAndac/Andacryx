@@ -1,9 +1,10 @@
-
 import type { WorkspaceFile } from "../types/workspace";
 
 const DB_NAME = "andacryx-workspace";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "workspace";
+const PROJECTS_STORE = "projects";
+const SETTINGS_STORE = "settings";
 
 export type WorkspaceSnapshot = {
   version: 1;
@@ -15,15 +16,30 @@ export type WorkspaceSnapshot = {
   diagramPositions: Record<string, Record<string, { x: number; y: number }>>;
 };
 
-function openDatabase(): Promise<IDBDatabase> {
+export function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onupgradeneeded = () => {
       const database = request.result;
 
+      // v0.9.0 Quick Analysis verilerini koruyoruz.
       if (!database.objectStoreNames.contains(STORE_NAME)) {
         database.createObjectStore(STORE_NAME);
+      }
+
+      // Kullanıcının isteğiyle kaydettiği projeler.
+      if (!database.objectStoreNames.contains(PROJECTS_STORE)) {
+        const projects = database.createObjectStore(PROJECTS_STORE, {
+          keyPath: "id",
+        });
+
+        projects.createIndex("updatedAt", "updatedAt");
+      }
+
+      // Gelecekte aktif proje ve diğer tercihler.
+      if (!database.objectStoreNames.contains(SETTINGS_STORE)) {
+        database.createObjectStore(SETTINGS_STORE);
       }
     };
 
@@ -32,7 +48,9 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-export async function saveWorkspace(snapshot: WorkspaceSnapshot): Promise<void> {
+export async function saveWorkspace(
+  snapshot: WorkspaceSnapshot,
+): Promise<void> {
   const database = await openDatabase();
 
   try {
