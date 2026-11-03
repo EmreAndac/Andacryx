@@ -1,0 +1,18 @@
+.workspace-identity { display: flex; align-items: center; gap: 10px; min-width: 0; color: #93c5fd; }
+.workspace-identity-label { display: flex; flex-direction: column; min-width: 0; gap: 3px; }
+.workspace-identity-label strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e2e8f0; font-size: 13px; }
+.workspace-identity-label small { color: #94a3b8; font-size: 11px; }
+.workspace-save-status { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 5px 9px; font-size: 11px; white-space: nowrap; }
+.workspace-save-clean { color: #86efac; background: rgba(34,197,94,.12); }
+.workspace-save-dirty { color: #fcd34d; background: rgba(245,158,11,.12); }
+.workspace-save-temporary { color: #cbd5e1; background: rgba(148,163,184,.13); }
+.sidebar-workspace-info { display: flex; flex-direction: column; gap: 5px; margin: 16px 8px 0; padding: 12px; border: 1px solid #29364b; border-radius: 9px; background: #101c30; min-width: 0; }
+.sidebar-workspace-type { color: #60a5fa; font-size: 10px; letter-spacing: 1px; font-weight: 700; }
+.sidebar-workspace-info strong { color: #e2e8f0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-workspace-info small { color: #94a3b8; font-size: 11px; }
+.tree-folder-container { display: flex; align-items: center; position: relative; min-width: 0; }
+.tree-folder-container > .tree-folder { flex: 1; min-width: 0; }
+.tree-folder-container > .tree-folder span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-folder-remove { flex-shrink: 0; margin-right: 6px; opacity: 0; }
+.tree-folder-container:hover .tree-folder-remove, .tree-folder-remove:focus-visible { opacity: 1; }
+.tree-folder-remove:hover { color: #f87171; background: rgba(248,113,113,.12); }

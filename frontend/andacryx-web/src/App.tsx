@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { FilePlus2, Upload, FolderOpen } from "lucide-react";
+import { FilePlus2, Upload, FolderOpen, Save, RotateCcw, CircleCheck, CircleDot, Zap, FolderGit2 } from "lucide-react";
 import FlowDiagram, {
   type FlowNodeDto,
   type MethodFlowDto,
 } from "./components/FlowDiagram";
 import "./App.css";
+import "./components/WorkspaceIdentity.css";
 import "./components/TopBar.css";
 import "./components/Sidebar.css";
 import "./components/CodeInspector.css";
@@ -21,6 +22,8 @@ import WorkspaceToolbar, {
 import type { WorkspaceFile, FlowAnalysisResult } from "./types/workspace";
 import { loadWorkspace, saveWorkspace, type WorkspaceSnapshot } from "./services/workspaceStorage";
 import MyProjects from "./components/MyProjects";
+import { createLocalProject, getLocalProject, saveLocalProject } from "./services/projectStorage";
+import { createEmptyWorkspace } from "./utils/workspaceFactory";
 
 const API_BASE_URL = "http://localhost:5050";
 
@@ -40,6 +43,11 @@ export default function App() {
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("split");
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [diagramPositions, setDiagramPositions] = useState<WorkspaceSnapshot["diagramPositions"]>({});
+  const [openedProject, setOpenedProject] = useState<{ id: string; name: string } | null>(null);
+  const [projectBusy, setProjectBusy] = useState(false);
+  const [projectMessage, setProjectMessage] = useState("");
+  const quickSnapshotRef = useRef<WorkspaceSnapshot | null>(null);
+  const savedProjectSnapshotRef = useRef<WorkspaceSnapshot | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,6 +83,7 @@ export default function App() {
           }
         }
 
+        quickSnapshotRef.current = snapshot;
         setFiles(restoredFiles);
         setOpenFileIds(restoredTabs);
         setActiveFileId(restoredActiveId);
@@ -92,34 +101,127 @@ export default function App() {
     return () => { cancelled = true; };
   }, []);
 
-  useEffect(() => {
-    if (!workspaceReady) return;
-
+  function captureSnapshot(): WorkspaceSnapshot {
     const selectedMethodLines: Record<string, number> = {};
     for (const [fileId, method] of Object.entries(selectedMethods)) {
       if (method) selectedMethodLines[fileId] = method.startLine;
     }
+    return { version: 1, files, openFileIds, activeFileId, selectedMethodLines, workspaceView, diagramPositions };
+  }
 
-    const snapshot: WorkspaceSnapshot = {
-      version: 1,
-      files,
-      openFileIds,
-      activeFileId,
-      selectedMethodLines,
-      workspaceView,
-      diagramPositions,
-    };
+  const projectDirty = openedProject !== null && savedProjectSnapshotRef.current !== null &&
+    JSON.stringify(captureSnapshot()) !== JSON.stringify(savedProjectSnapshotRef.current);
 
+  function applySnapshot(snapshot: WorkspaceSnapshot) {
+    const restoredFiles = snapshot.files ?? [];
+    const ids = new Set(restoredFiles.map(file => file.id));
+    const tabs = (snapshot.openFileIds ?? []).filter(id => ids.has(id));
+    const active = snapshot.activeFileId && tabs.includes(snapshot.activeFileId) ? snapshot.activeFileId : tabs[0] ?? null;
+    const methods: Record<string, MethodFlowDto | null> = {};
+    for (const file of restoredFiles) {
+      const line = snapshot.selectedMethodLines?.[file.id];
+      if (line !== undefined) methods[file.id] = file.flow.methods.find(method => method.startLine === line) ?? null;
+    }
+    setFiles(restoredFiles);
+    setOpenFileIds(tabs);
+    setActiveFileId(active);
+    setSelectedMethods(methods);
+    setSelectedNodes({});
+    setWorkspaceView(snapshot.workspaceView ?? "split");
+    setDiagramPositions(snapshot.diagramPositions ?? {});
+  }
+
+  useEffect(() => {
+    if (!workspaceReady || openedProject) return;
+    const snapshot = captureSnapshot();
+    quickSnapshotRef.current = snapshot;
     const timeout = window.setTimeout(() => {
-      // Kaydetme işlemlerini sıraya alarak eski verinin yenisini ezmesini önle.
       saveQueueRef.current = saveQueueRef.current
         .catch(() => undefined)
         .then(() => saveWorkspace(snapshot))
         .catch(err => console.error("Workspace save failed:", err));
     }, 400);
-
     return () => window.clearTimeout(timeout);
-  }, [workspaceReady, files, openFileIds, activeFileId, selectedMethods, workspaceView, diagramPositions]);
+  }, [workspaceReady, openedProject, files, openFileIds, activeFileId, selectedMethods, workspaceView, diagramPositions]);
+
+  async function saveAsProject() {
+    if (projectBusy || loading) return;
+    const name = window.prompt("Yeni projenin adı:", openedProject?.name ?? "My Project");
+    if (name === null) return;
+    if (!name.trim()) { window.alert("Proje adı boş olamaz."); return; }
+    setProjectBusy(true);
+    try {
+      const project = await createLocalProject(name, captureSnapshot());
+      setProjectMessage(`“${project.name}” yerel projelere kaydedildi.`);
+      setActivePage("projects");
+    } catch (err) { window.alert(err instanceof Error ? err.message : "Proje kaydedilemedi."); }
+    finally { setProjectBusy(false); }
+  }
+
+  async function openProject(projectId: string) {
+    if (projectBusy || loading) return;
+    if (projectDirty && !window.confirm("Açık projedeki kaydedilmemiş değişiklikler kaybolacak. Devam edilsin mi?")) return;
+    setProjectBusy(true);
+    try {
+      const project = await getLocalProject(projectId);
+      if (!project) throw new Error("Proje bulunamadı.");
+      if (!openedProject) {
+        const quick = captureSnapshot();
+        quickSnapshotRef.current = quick;
+        await saveQueueRef.current.catch(() => undefined);
+        await saveWorkspace(quick);
+      }
+      savedProjectSnapshotRef.current = project.snapshot;
+      applySnapshot(project.snapshot);
+      setOpenedProject({ id: project.id, name: project.name });
+      setProjectMessage("");
+      setActivePage("overview");
+    } catch (err) { window.alert(err instanceof Error ? err.message : "Proje açılamadı."); }
+    finally { setProjectBusy(false); }
+  }
+
+  async function saveOpenedProject() {
+    if (!openedProject || projectBusy || loading) return;
+    setProjectBusy(true);
+    try {
+      const snapshot = captureSnapshot();
+      await saveLocalProject(openedProject.id, snapshot);
+      savedProjectSnapshotRef.current = snapshot;
+      setProjectMessage("Proje değişiklikleri kaydedildi.");
+    } catch (err) { window.alert(err instanceof Error ? err.message : "Değişiklikler kaydedilemedi."); }
+    finally { setProjectBusy(false); }
+  }
+
+  function returnToQuickAnalysis() {
+    if (loading || projectBusy) return;
+    if (projectDirty && !window.confirm("Kaydedilmemiş proje değişiklikleri kaybolacak. Quick Analysis'e dönülsün mü?")) return;
+    if (openedProject) {
+      applySnapshot(quickSnapshotRef.current ?? createEmptyWorkspace());
+      setOpenedProject(null);
+      savedProjectSnapshotRef.current = null;
+    }
+    setProjectMessage("");
+    setActivePage("overview");
+  }
+
+  async function newQuickAnalysis() {
+    if (loading || projectBusy) return;
+    if (!window.confirm("Yeni geçici analiz başlatılsın mı? Mevcut Quick Analysis içeriği temizlenecek. Kayıtlı projeler etkilenmez.")) return;
+    if (openedProject) {
+      await saveQueueRef.current.catch(() => undefined);
+    }
+    const empty = createEmptyWorkspace();
+    try {
+      await saveQueueRef.current.catch(() => undefined);
+      await saveWorkspace(empty);
+      quickSnapshotRef.current = empty;
+      applySnapshot(empty);
+      setOpenedProject(null);
+      savedProjectSnapshotRef.current = null;
+      setProjectMessage("");
+      setActivePage("overview");
+    } catch (err) { window.alert(err instanceof Error ? err.message : "Yeni çalışma alanı oluşturulamadı."); }
+  }
 
   function handlePositionsChange(key: string, positions: Record<string, { x: number; y: number }>) {
     setDiagramPositions(previous => ({ ...previous, [key]: positions }));
@@ -283,6 +385,27 @@ export default function App() {
     }
   }
 
+  function removeFolder(folderPath: string) {
+    if (loading || projectBusy) return;
+    const normalized = folderPath.replaceAll("\\", "/");
+    const matching = files.filter(file => {
+      const path = file.path.replaceAll("\\", "/");
+      return path.startsWith(`${normalized}/`);
+    });
+    if (!matching.length) return;
+    if (!window.confirm(`“${normalized}” klasörü ve içindeki ${matching.length} C# dosyası çalışma alanından kaldırılacak. Devam edilsin mi?`)) return;
+
+    const removedIds = new Set(matching.map(file => file.id));
+    const remainingTabs = openFileIds.filter(id => !removedIds.has(id));
+    setFiles(previous => previous.filter(file => !removedIds.has(file.id)));
+    setOpenFileIds(remainingTabs);
+    setActiveFileId(previous => previous && removedIds.has(previous) ? remainingTabs[0] ?? null : previous);
+    setSelectedMethods(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => !removedIds.has(id))));
+    setSelectedNodes(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => !removedIds.has(id))));
+    setDiagramPositions(previous => Object.fromEntries(Object.entries(previous).filter(([key]) => ![...removedIds].some(id => key.startsWith(`${id}:`)))));
+    setProjectMessage("");
+  }
+
   function selectMethod(fileId: string, method: MethodInfo) {
     const file = files.find((item) => item.id === fileId);
 
@@ -330,18 +453,42 @@ export default function App() {
           onMethodSelect={selectMethod}
           onFileAdd={openFilePicker}
           onFileRemove={removeFile}
+          onFolderRemove={removeFolder}
+          workspaceName={openedProject?.name ?? "Quick Analysis"}
+          workspaceType={openedProject ? "project" : "quick"}
+          workspaceDirty={projectDirty}
         />
 
         <main className="main">
           <header>
-            <h1>{activePage === "projects" ? "My Projects" : "Code Flow Explorer"}</h1>
+            <h1>{activePage === "projects" ? "My Projects" : openedProject ? openedProject.name : "Code Flow Explorer"}</h1>
             <span>v{APP_CONFIG.version}</span>
           </header>
 
           {activePage === "projects" ? (
-            <MyProjects onBack={() => setActivePage("overview")} />
+            <MyProjects onBack={returnToQuickAnalysis} onOpen={openProject} onSaveCurrent={saveAsProject} />
           ) : (
           <section className="workspace">
+            <div className="project-workspace-actions">
+              <div className="workspace-identity">
+                {openedProject ? <FolderGit2 size={17} /> : <Zap size={17} />}
+                <div className="workspace-identity-label">
+                  <strong>{openedProject?.name ?? "Quick Analysis"}</strong>
+                  <small>{openedProject ? "My Projects / Local Project" : "Temporary workspace / Quick Analysis"}</small>
+                </div>
+                {openedProject ? (
+                  <span className={`workspace-save-status ${projectDirty ? "workspace-save-dirty" : "workspace-save-clean"}`}>
+                    {projectDirty ? <CircleDot size={13} /> : <CircleCheck size={13} />}
+                    {projectDirty ? "Unsaved Changes" : "Saved"}
+                  </span>
+                ) : <span className="workspace-save-status workspace-save-temporary">Temporary</span>}
+              </div>
+              {projectMessage && !projectDirty && <span role="status">{projectMessage}</span>}
+              {openedProject && <button type="button" disabled={projectBusy || loading} onClick={() => void saveOpenedProject()}><Save size={15}/> Save Changes</button>}
+              <button type="button" disabled={projectBusy || loading} onClick={() => void saveAsProject()}><Save size={15}/> Save as Project</button>
+              <button type="button" disabled={projectBusy || loading} onClick={() => void newQuickAnalysis()}><RotateCcw size={15}/> New Quick Analysis</button>
+              {openedProject && <button type="button" disabled={projectBusy || loading} onClick={returnToQuickAnalysis}>Quick Analysis'e dön</button>}
+            </div>
             <input
               ref={fileInputRef}
               type="file"

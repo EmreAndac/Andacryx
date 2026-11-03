@@ -34,6 +34,10 @@ type Props = {
   onMethodSelect: (fileId: string, method: MethodInfo) => void;
   onFileAdd: () => void;
   onFileRemove: (fileId: string) => void;
+  onFolderRemove: (folderPath: string) => void;
+  workspaceName: string;
+  workspaceType: "quick" | "project";
+  workspaceDirty: boolean;
 };
 
 export default function Sidebar({
@@ -46,6 +50,10 @@ export default function Sidebar({
   onMethodSelect,
   onFileAdd,
   onFileRemove,
+  onFolderRemove,
+  workspaceName,
+  workspaceType,
+  workspaceDirty,
 }: Props) {
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [search, setSearch] = useState("");
@@ -112,6 +120,13 @@ export default function Sidebar({
         </div>
       </nav>
 
+      {activePage === "overview" && (
+        <div className="sidebar-workspace-info" title={workspaceName}>
+          <span className="sidebar-workspace-type">{workspaceType === "project" ? "LOCAL PROJECT" : "QUICK ANALYSIS"}</span>
+          <strong>{workspaceName}</strong>
+          <small>{workspaceType === "project" ? (workspaceDirty ? "● Unsaved Changes" : "✓ Saved") : "Temporary workspace"}</small>
+        </div>
+      )}
       <div className="sidebar-divider" style={{ display: activePage === "overview" ? undefined : "none" }} />
 
       <div className="sidebar-explorer-heading" style={{ display: activePage === "overview" ? undefined : "none" }}>
@@ -210,6 +225,7 @@ export default function Sidebar({
               onFileSelect={onFileSelect}
               onMethodSelect={onMethodSelect}
               onFileRemove={onFileRemove}
+              onFolderRemove={onFolderRemove}
             />
           )}
         </div>

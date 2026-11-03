@@ -22,6 +22,7 @@ type Props = {
   onFileSelect: (fileId: string) => void;
   onMethodSelect: (fileId: string, method: MethodInfo) => void;
   onFileRemove: (fileId: string) => void;
+  onFolderRemove: (folderPath: string) => void;
 };
 
 export default function FileTree({
@@ -34,6 +35,7 @@ export default function FileTree({
   onFileSelect,
   onMethodSelect,
   onFileRemove,
+  onFolderRemove,
 }: Props) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [forcedClosed, setForcedClosed] = useState(false);
@@ -168,17 +170,26 @@ export default function FileTree({
 
       return (
         <div key={node.id} className="tree-group">
-          <button
-            type="button"
-            className="tree-row tree-folder"
-            style={{ paddingLeft: 10 + depth * 15 }}
-            onClick={() => toggleFolder(node)}
-            aria-expanded={open}
-          >
-            {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            {open ? <FolderOpen size={16} /> : <Folder size={16} />}
-            <span title={node.path}>{node.name}</span>
-          </button>
+          <div className="tree-folder-container">
+            <button
+              type="button"
+              className="tree-row tree-folder"
+              style={{ paddingLeft: 10 + depth * 15 }}
+              onClick={() => toggleFolder(node)}
+              aria-expanded={open}
+            >
+              {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              {open ? <FolderOpen size={16} /> : <Folder size={16} />}
+              <span title={node.path}>{node.name}</span>
+            </button>
+            <button
+              type="button"
+              className="tree-remove tree-folder-remove"
+              title={`${node.name} klasörünü tüm dosyalarıyla kaldır`}
+              aria-label={`${node.name} klasörünü kaldır`}
+              onClick={() => onFolderRemove(node.path)}
+            ><X size={14} /></button>
+          </div>
 
           {open && node.children.map((child) => renderNode(child, depth + 1))}
         </div>
