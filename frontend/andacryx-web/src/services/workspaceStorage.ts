@@ -1,4 +1,5 @@
 import type { WorkspaceFile } from "../types/workspace";
+import type { DotnetManifest } from "../types/dotnetProject";
 
 const DB_NAME = "andacryx-workspace";
 const DB_VERSION = 2;
@@ -9,6 +10,7 @@ const SETTINGS_STORE = "settings";
 export type WorkspaceSnapshot = {
   version: 1;
   files: WorkspaceFile[];
+  dotnetManifests?: DotnetManifest[];
   openFileIds: string[];
   activeFileId: string | null;
   selectedMethodLines: Record<string, number>;

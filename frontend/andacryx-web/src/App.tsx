@@ -24,12 +24,15 @@ import { loadWorkspace, saveWorkspace, type WorkspaceSnapshot } from "./services
 import MyProjects from "./components/MyProjects";
 import { createLocalProject, getLocalProject, saveLocalProject } from "./services/projectStorage";
 import { createEmptyWorkspace } from "./utils/workspaceFactory";
+import type { DotnetManifest } from "./types/dotnetProject";
+import { parseDotnetManifest } from "./utils/dotnetProject";
 
 const API_BASE_URL = "http://localhost:5050";
 
 export default function App() {
   const [activePage, setActivePage] = useState<"overview" | "projects">("overview");
   const [files, setFiles] = useState<WorkspaceFile[]>([]);
+  const [dotnetManifests, setDotnetManifests] = useState<DotnetManifest[]>([]);
   const [openFileIds, setOpenFileIds] = useState<string[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [selectedMethods, setSelectedMethods] = useState<
@@ -85,6 +88,7 @@ export default function App() {
 
         quickSnapshotRef.current = snapshot;
         setFiles(restoredFiles);
+        setDotnetManifests(snapshot.dotnetManifests ?? []);
         setOpenFileIds(restoredTabs);
         setActiveFileId(restoredActiveId);
         setSelectedMethods(restoredMethods);
@@ -106,7 +110,7 @@ export default function App() {
     for (const [fileId, method] of Object.entries(selectedMethods)) {
       if (method) selectedMethodLines[fileId] = method.startLine;
     }
-    return { version: 1, files, openFileIds, activeFileId, selectedMethodLines, workspaceView, diagramPositions };
+    return { version: 1, files, dotnetManifests, openFileIds, activeFileId, selectedMethodLines, workspaceView, diagramPositions };
   }
 
   const projectDirty = openedProject !== null && savedProjectSnapshotRef.current !== null &&
@@ -123,6 +127,7 @@ export default function App() {
       if (line !== undefined) methods[file.id] = file.flow.methods.find(method => method.startLine === line) ?? null;
     }
     setFiles(restoredFiles);
+    setDotnetManifests(snapshot.dotnetManifests ?? []);
     setOpenFileIds(tabs);
     setActiveFileId(active);
     setSelectedMethods(methods);
@@ -142,7 +147,7 @@ export default function App() {
         .catch(err => console.error("Workspace save failed:", err));
     }, 400);
     return () => window.clearTimeout(timeout);
-  }, [workspaceReady, openedProject, files, openFileIds, activeFileId, selectedMethods, workspaceView, diagramPositions]);
+  }, [workspaceReady, openedProject, files, openFileIds, activeFileId, selectedMethods, workspaceView, diagramPositions, dotnetManifests]);
 
   async function saveAsProject() {
     if (projectBusy || loading) return;
@@ -270,11 +275,11 @@ export default function App() {
       sourceCode,
       analysis,
       flow,
+      sourceType: file.webkitRelativePath ? "folder" : "individual",
     };
   }
 
-  function isSupportedFile(file: File) {
-    if (!file.name.toLowerCase().endsWith(".cs")) return false;
+  function isIgnoredPath(path: string) {
 
     const ignoredFolders = new Set([
       "bin",
@@ -286,30 +291,35 @@ export default function App() {
       "build",
     ]);
 
-    const pathParts = (file.webkitRelativePath || file.name)
-      .replaceAll("\\", "/")
-      .split("/");
+    const pathParts = path.replaceAll("\\", "/").split("/");
+    return pathParts.some((part) => ignoredFolders.has(part.toLowerCase()));
+  }
 
-    return !pathParts.some((part) => ignoredFolders.has(part.toLowerCase()));
+  function isSupportedFile(file: File) {
+    return file.name.toLowerCase().endsWith(".cs") && !isIgnoredPath(file.webkitRelativePath || file.name);
   }
 
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
-    const selectedFiles = Array.from(event.target.files ?? [])
-      .filter(isSupportedFile)
-      .filter((file) => {
-        const path = file.webkitRelativePath || file.name;
-        return !files.some((existing) => existing.path === path);
-      });
-
-    if (selectedFiles.length === 0) {
+    const incoming = Array.from(event.target.files ?? []);
+    const manifests = incoming.filter(file => /\.(sln|slnx|csproj)$/i.test(file.name) && !isIgnoredPath(file.webkitRelativePath || file.name));
+    const selectedFiles = incoming.filter(isSupportedFile).filter(file => {
+      const path = file.webkitRelativePath || file.name;
+      return !files.some(existing => existing.path === path);
+    });
+    const newManifests = (await Promise.all(manifests.map(async file =>
+      parseDotnetManifest(file.webkitRelativePath || file.name, await file.text())
+    ))).filter((item): item is DotnetManifest => item !== null);
+    const freshManifests = newManifests.filter(item => !dotnetManifests.some(existing => existing.path === item.path));
+    if (selectedFiles.length === 0 && freshManifests.length === 0) {
       event.target.value = "";
-      setError("Yeni veya desteklenen C# dosyası bulunamadı.");
+      setError(`Seçilen ${incoming.length} dosyada yeni .cs, .sln, .slnx veya .csproj bulunamadı. Solution klasörünün kökünü seçtiğinden emin ol.`);
       return;
     }
 
     event.target.value = "";
     setLoading(true);
     setError("");
+    if (freshManifests.length) setDotnetManifests(previous => [...previous, ...freshManifests]);
 
     try {
       const results = await Promise.allSettled(selectedFiles.map(analyzeFile));
@@ -398,6 +408,7 @@ export default function App() {
     const removedIds = new Set(matching.map(file => file.id));
     const remainingTabs = openFileIds.filter(id => !removedIds.has(id));
     setFiles(previous => previous.filter(file => !removedIds.has(file.id)));
+    setDotnetManifests(previous => previous.filter(item => !item.path.startsWith(`${normalized}/`) && item.path !== normalized));
     setOpenFileIds(remainingTabs);
     setActiveFileId(previous => previous && removedIds.has(previous) ? remainingTabs[0] ?? null : previous);
     setSelectedMethods(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => !removedIds.has(id))));
@@ -501,11 +512,25 @@ export default function App() {
               ref={folderInputRef}
               type="file"
               multiple
-              accept=".cs"
               {...{ webkitdirectory: "", directory: "" }}
               onChange={handleUpload}
               hidden
             />
+            {dotnetManifests.length > 0 && (
+              <div className="dotnet-project-overview" style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-color, #334155)" }}>
+                <strong>.NET Project Intelligence</strong>
+                <span style={{ marginLeft: 12, opacity: 0.75 }}>{dotnetManifests.filter(item => item.kind === "solution").length} solution · {dotnetManifests.filter(item => item.kind === "project").length} project</span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8 }}>
+                  {dotnetManifests.map(item => (
+                    <div key={item.path} title={item.path} style={{ border: "1px solid #334155", borderRadius: 8, padding: "8px 12px", minWidth: 180 }}>
+                      <strong>{item.name}</strong>
+                      <div style={{ fontSize: 12, opacity: 0.8 }}>{item.kind === "solution" ? `${item.projectPaths.length} project reference(s)` : (item.targetFrameworks.join(", ") || "Framework unspecified")}</div>
+                      {item.kind === "project" && item.projectReferences.length > 0 && <div style={{ fontSize: 12, opacity: 0.8 }}>{item.projectReferences.length} project dependency(ies)</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <FileTabs
               files={files.filter((file) => openFileIds.includes(file.id))}
               activeFileId={activeFileId}

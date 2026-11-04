@@ -13,4 +13,5 @@ export type WorkspaceFile = {
   sourceCode: string;
   analysis: AnalysisResult;
   flow: FlowAnalysisResult;
+  sourceType?: "folder" | "individual";
 };
